@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'xendit' => [
+        'mode' => env('MARKETPLACE_PAYMENT_MODE', 'simulated'),
+        'secret_key' => env('XENDIT_SECRET_KEY'),
+        'webhook_token' => env('XENDIT_WEBHOOK_TOKEN'),
+        'base_url' => env('XENDIT_BASE_URL', 'https://api.xendit.co'),
+        'timeout' => (int) env('XENDIT_TIMEOUT', 10),
+        // Explicitly configure this below 100%; the remainder must cover actual Xendit fees.
+        'marketplace_seller_payout_percent' => env('XENDIT_MARKETPLACE_SELLER_PAYOUT_PERCENT'),
+    ],
+
 ];

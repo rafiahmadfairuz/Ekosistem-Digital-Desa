@@ -1,0 +1,11 @@
+<x-layouts.app title="{{ $product->name }}">
+    <main id="main" class="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-8">
+        <a href="{{ route('marketplace.index') }}" class="text-sm underline">Kembali ke pasar</a>
+        <article class="grid gap-6 rounded-card border border-line bg-paper p-5 md:grid-cols-2 md:p-8">
+            <div class="space-y-3">@forelse($product->images as $image)<img src="{{ route('marketplace.products.images.show', [$product,$image]) }}" alt="{{ $image->alt_text }}" width="960" height="720" loading="lazy" class="max-h-[34rem] w-full rounded-control border border-line object-contain">@empty<div class="flex aspect-square items-center justify-center rounded-control bg-slate-100 text-muted">Belum ada foto produk</div>@endforelse</div>
+            <div><p class="text-sm text-muted">{{ $product->category->name }} · Dijual oleh {{ $product->seller->business_name }}</p><h1 class="mt-2 text-3xl font-semibold">{{ $product->name }}</h1><p class="mt-4 text-2xl font-semibold tabular-nums">Rp{{ number_format((float)$product->price,0,',','.') }} <span class="text-base font-normal text-muted">/ {{ $product->unit }}</span></p><p class="mt-2 text-sm">{{ $product->stock > 0 ? 'Stok tersedia: '.$product->stock : 'Stok sedang habis' }}</p><div class="mt-6 whitespace-pre-line leading-7">{{ $product->description }}</div><p class="mt-6 rounded-control border border-line bg-canvas p-4 text-sm text-muted">Penjual bertanggung jawab atas kualitas dan pengiriman produk. Pembayaran pesanan saat ini menggunakan COD dan tetap menunggu konfirmasi penerimaan yang sah.</p>
+                @auth @if(auth()->user()->hasRole('Resident') && $product->isPubliclyAvailable())<form method="POST" action="{{ route('marketplace.cart.add',$product) }}" class="mt-5 flex items-end gap-2" data-cart-add-form>@csrf<label class="text-sm">Jumlah<input name="quantity" type="number" min="1" max="{{ min(1000,$product->stock) }}" value="1" class="mt-1 block min-h-11 w-24 rounded-control border border-line px-3"></label><x-ui.button type="submit">Tambah ke keranjang</x-ui.button></form>@endif @else<a href="{{ route('login') }}" class="mt-5 inline-flex min-h-11 items-center underline">Masuk untuk membeli</a>@endauth
+            </div>
+        </article>
+    </main>
+</x-layouts.app>
