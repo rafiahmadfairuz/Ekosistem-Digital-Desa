@@ -23,6 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(AddSecurityHeaders::class);
 
+        $trustedProxies = array_filter(array_map('trim', explode(',', (string) env('TRUSTED_PROXIES', '127.0.0.1,::1'))));
+        $middleware->trustProxies(at: $trustedProxies);
+
         $middleware->alias([
             'account.active' => EnsureActiveAccount::class,
             'role' => EnsureUserHasRole::class,

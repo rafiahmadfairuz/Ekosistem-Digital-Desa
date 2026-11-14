@@ -101,6 +101,30 @@ class MarketplaceTest extends TestCase
         $this->assertDatabaseCount('checkout_groups', 0);
     }
 
+    public function test_super_admin_can_open_xendit_settings_page(): void
+    {
+        $admin = $this->userWithRoles(['Super Admin']);
+
+        $this->actingAs($admin)->get(route('admin.marketplace.xendit-seller-accounts.index'))
+            ->assertOk()
+            ->assertSee('Pembayaran Xendit marketplace')
+            ->assertSee('Pencairan penjual')
+            ->assertDontSee('xendit-seller-accounts.update');
+    }
+
+    public function test_marketplace_links_use_https_from_a_trusted_ngrok_proxy(): void
+    {
+        $buyer = $this->userWithRoles(['Resident']);
+
+        $this->actingAs($buyer)
+            ->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->withHeader('X-Forwarded-Proto', 'https')
+            ->withHeader('X-Forwarded-Host', 'desa-test.ngrok-free.dev')
+            ->get('http://desa-test.ngrok-free.dev/marketplace')
+            ->assertOk()
+            ->assertSee('action="https://desa-test.ngrok-free.dev/marketplace"', false);
+    }
+
     public function test_add_to_cart_returns_to_product_page_with_confirmation(): void
     {
         $buyer = $this->userWithRoles(['Resident']);

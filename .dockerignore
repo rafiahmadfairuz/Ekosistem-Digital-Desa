@@ -23,3 +23,19 @@ bootstrap/cache/*.php
 database/*.sqlite
 database/*.sqlite3
 *.sqlite-journal
+
+# Local-only agent instructions, skills, and generated reference archives.
+AGENTS.md
+**/AGENTS.md
+CLAUDE.md
+**/CLAUDE.md
+CODEX*.md
+**/CODEX*.md
+PHASE_*.md
+**/PHASE_*.md
+.agents
+.ai
+andrej-karpathy-skills
+desa-digital-images.tar
+docs/erd-images.zip
+docs/erd-images
