@@ -454,6 +454,34 @@ class AuthorizationTest extends TestCase
         $this->assertFalse($secondTarget->fresh()->hasRole('Village Head'));
     }
 
+    public function test_role_management_allows_only_the_two_defined_multi_role_combinations(): void
+    {
+        $this->seed(RolesSeeder::class);
+        $admin = $this->userWithRoles(['Super Admin']);
+        $roleIds = Role::query()->pluck('id', 'name');
+
+        foreach ([['RT', 'Resident'], ['RW', 'Resident']] as $allowedRoles) {
+            $target = User::factory()->active()->create();
+            $this->actingAs($admin)->put(route('admin.users.roles.update', $target), [
+                'role_ids' => array_map(fn (string $name): int => (int) $roleIds[$name], $allowedRoles),
+            ])->assertRedirect();
+            $this->assertEqualsCanonicalizing($allowedRoles, $target->fresh()->roles->pluck('name')->all());
+        }
+
+        foreach ([
+            ['RT', 'RW'], ['RT', 'RW', 'Resident'], ['Village Head', 'Resident'],
+            ['Village Head', 'RT'], ['BUMDes Manager', 'Resident'], ['BUMDes Operator', 'Resident'],
+            ['Seller', 'Resident'], ['Super Admin', 'Resident'],
+        ] as $forbiddenRoles) {
+            $target = User::factory()->active()->create();
+            $response = $this->from(route('admin.users.index'))->put(route('admin.users.roles.update', $target), [
+                'role_ids' => array_map(fn (string $name): int => (int) $roleIds[$name], $forbiddenRoles),
+            ]);
+            $this->assertContains($response->getStatusCode(), [302, 422]);
+            $this->assertCount(0, $target->fresh()->roles);
+        }
+    }
+
     public function test_suspending_an_account_revokes_sessions_but_keeps_assignments_for_reactivation(): void
     {
         $this->seed(RolesSeeder::class);

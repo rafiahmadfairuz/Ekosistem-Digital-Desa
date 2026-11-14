@@ -1,6 +1,7 @@
 <x-layouts.app title="Tinjau penjual">
     <main id="main" class="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-8">
         <x-ui.page-heading title="Pengajuan penjual" description="Periksa data usaha dan dokumen, lalu catat keputusan. Pemohon tidak dapat meninjau pengajuannya sendiri." />
+        <a href="{{ route('marketplace.management.payout-accounts') }}" class="inline-flex min-h-11 items-center rounded-control border border-line px-4 underline underline-offset-4">Verifikasi rekening payout</a>
 
         <section aria-labelledby="applications-heading" class="space-y-4">
             <div class="flex flex-wrap items-end justify-between gap-3">

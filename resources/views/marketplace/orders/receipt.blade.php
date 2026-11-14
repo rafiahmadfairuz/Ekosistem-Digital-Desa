@@ -51,7 +51,7 @@
                 </div>
             </section>
 
-            @if($checkoutPayment?->payment_provider === 'xendit')
+            @if($checkoutPayment?->payment_provider === 'xendit' && $checkoutPayment->allocations->isNotEmpty())
                 <section data-receipt-section class="border-b border-line py-5" aria-labelledby="receipt-allocation-title">
                     <h2 id="receipt-allocation-title" class="mb-3 text-lg font-semibold">Pembagian pembayaran Xendit</h2>
                     <table class="w-full border-collapse text-left text-sm">

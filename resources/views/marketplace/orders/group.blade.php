@@ -4,7 +4,7 @@
         <x-ui.page-heading title="{{ $isFinal ? 'Pembelian selesai' : ($group->status === 'awaiting_payment' ? 'Selesaikan pembayaran checkout' : 'Ringkasan checkout') }}" description="{{ $group->checkout_number }} · Satu pembayaran untuk seluruh pesanan dari beberapa penjual." />
         @if($group->status === 'awaiting_payment' && $group->payment?->payment_provider === 'xendit')
             <section class="flex flex-wrap items-center justify-between gap-4 rounded-card border border-warning-ink/30 bg-warning-bg p-5 text-warning-ink" aria-labelledby="checkout-payment-title">
-                <div><h2 id="checkout-payment-title" class="font-semibold">Pembayaran checkout</h2><p class="mt-1 text-sm">Total {{ 'Rp'.number_format((float) $group->grand_total, 0, ',', '.') }} · Dana dialokasikan ke setiap penjual setelah pembayaran terverifikasi.</p></div>
+                <div><h2 id="checkout-payment-title" class="font-semibold">Pembayaran checkout</h2><p class="mt-1 text-sm">Total {{ 'Rp'.number_format((float) $group->grand_total, 0, ',', '.') }} · Pesanan diteruskan setelah Xendit mengonfirmasi pembayaran.</p></div>
                 <form method="POST" action="{{ route('marketplace.orders.group.payment-session', $group) }}">@csrf<x-ui.button type="submit">{{ $group->payment->checkout_url ? 'Lanjutkan pembayaran' : 'Bayar seluruh pesanan dengan Xendit' }}</x-ui.button></form>
             </section>
         @elseif($group->status === 'settlement_pending')
@@ -21,7 +21,7 @@
                 <li><strong>4. Barang diserahkan</strong><span class="mt-1 block">Lihat pembaruan pengantaran atau pengambilan.</span></li>
                 <li><strong>5. Anda konfirmasi</strong><span class="mt-1 block">Konfirmasi setelah barang diterima.</span></li>
             </ol>
-            <p class="mt-4 border-t border-success-ink/20 pt-3 text-sm font-medium">{{ $isFinal ? 'Semua pesanan selesai dan pembayarannya telah dikonfirmasi. Struk final tersedia.' : ($group->payment?->payment_provider === 'xendit' ? 'Penjual belum menerima pesanan. Checkout baru diteruskan setelah pembayaran dan seluruh alokasi dana terverifikasi.' : 'Bukti checkout ini mencatat pesanan. COD tetap menunggu konfirmasi pengumpulan uang yang sah.') }}</p>
+            <p class="mt-4 border-t border-success-ink/20 pt-3 text-sm font-medium">{{ $isFinal ? 'Semua pesanan selesai dan pembayarannya telah dikonfirmasi. Struk final tersedia.' : ($group->payment?->payment_provider === 'xendit' ? 'Penjual belum menerima pesanan. Checkout diteruskan setelah Xendit mengonfirmasi pembayaran.' : 'Bukti checkout ini mencatat pesanan. COD tetap menunggu konfirmasi pengumpulan uang yang sah.') }}</p>
         </section>
         <div class="flex flex-wrap gap-3">
             <a href="{{ route('marketplace.orders.group.receipt', $group) }}" class="inline-flex min-h-11 items-center rounded-control bg-brand-strong px-4 font-semibold text-white">{{ $isFinal ? 'Lihat struk final pembelian' : 'Lihat bukti checkout' }}</a>
@@ -34,10 +34,10 @@
                 <button type="submit" class="mt-3 inline-flex min-h-11 items-center rounded-control border border-danger px-4 font-semibold text-danger hover:bg-danger/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger">Hapus dari riwayat saya</button>
             </form>
         @endif
-        @if($checkoutPayment?->payment_provider === 'xendit')
+        @if($checkoutPayment?->payment_provider === 'xendit' && $checkoutPayment->allocations->isNotEmpty())
             <section class="rounded-card border border-line bg-paper p-5" aria-labelledby="allocation-title">
                 <h2 id="allocation-title" class="font-semibold">Rincian pembagian pembayaran</h2>
-                <p class="mt-1 text-sm leading-6 text-muted">Total yang dibayar sekali akan dialokasikan otomatis oleh Xendit ke sub-account tiap penjual setelah dana masuk. Sisa saldo platform dipakai untuk biaya provider; jumlah bersih akhirnya mengikuti biaya Xendit dan dapat diperiksa pada dasbor XenPlatform.</p>
+                <p class="mt-1 text-sm leading-6 text-muted">Catatan ini hanya berlaku untuk checkout lama yang memakai split. Checkout baru memakai satu akun merchant Xendit dan tidak menampilkan alokasi otomatis.</p>
                 <ul class="mt-4 divide-y divide-line">
                     @foreach($group->orders as $order)
                         @php($allocation = $checkoutPayment->allocations->firstWhere('order_id', $order->id))

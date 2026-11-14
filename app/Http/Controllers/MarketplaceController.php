@@ -112,10 +112,51 @@ class MarketplaceController extends Controller
     {
         $this->authorize('create', Product::class);
         $seller = $request->user()->seller;
-        $products = $seller->products()->with('category')->latest()->paginate(15);
+        $products = $seller->products()->where('status', '!=', 'archived')->with('category')->latest()->paginate(15);
         $categories = ProductCategory::query()->where('is_active', true)->orderBy('name')->get();
 
         return view('marketplace.seller.products', compact('products', 'categories'));
+    }
+
+    public function archivedProducts(Request $request)
+    {
+        $this->authorize('create', Product::class);
+        $products = $request->user()->seller->products()
+            ->where('status', 'archived')
+            ->with(['category', 'images', 'moderationEvents'])
+            ->latest()
+            ->paginate(15);
+
+        return view('marketplace.seller.archived-products', compact('products'));
+    }
+
+    public function restoreProduct(Request $request, Product $product, AuditLogger $audit)
+    {
+        $this->authorize('restore', $product);
+        DB::transaction(function () use ($product, $request, $audit): void {
+            $locked = Product::query()->whereKey($product->getKey())->lockForUpdate()->firstOrFail();
+            $this->authorize('restore', $locked);
+            $archiveEvent = $locked->moderationEvents()
+                ->where('to_status', 'archived')
+                ->latest('created_at')
+                ->first();
+            abort_unless($archiveEvent !== null, 409, 'Riwayat pengarsipan produk tidak tersedia.');
+
+            $previousStatus = $archiveEvent->from_status;
+            abort_unless(is_string($previousStatus) && $previousStatus !== 'archived', 409, 'Status produk sebelum diarsipkan tidak valid.');
+
+            $locked->forceFill(['status' => $previousStatus])->save();
+            $locked->moderationEvents()->create([
+                'actor_id' => $request->user()->getKey(),
+                'from_status' => 'archived',
+                'to_status' => $previousStatus,
+                'reason' => 'Produk dipulihkan oleh pemilik.',
+                'created_at' => now(),
+            ]);
+            $audit->record('marketplace.product_restored', 'product', (int) $locked->getKey(), ['to_status' => $previousStatus]);
+        });
+
+        return to_route('marketplace.seller.products')->with('status', 'Produk dipulihkan ke daftar produk Anda.');
     }
 
     public function editProduct(Request $request, Product $product)
@@ -256,34 +297,34 @@ class MarketplaceController extends Controller
             return to_route('marketplace.cart')->withErrors(['cart' => 'Hapus produk dari usaha milik Anda sebelum checkout.']);
         }
 
-        $sellerAccountsReady = $cart->items->every(fn (CartItem $item): bool => filled($item->product?->seller?->xendit_account_id));
-        $payoutPercent = config('services.xendit.marketplace_seller_payout_percent');
-        $payoutConfigReady = is_numeric($payoutPercent) && (float) $payoutPercent > 0 && (float) $payoutPercent < 100;
-        $providerConfigured = in_array(config('services.xendit.mode'), ['test', 'live'], true)
+        $paymentProviderConfigured = in_array(config('services.xendit.mode'), ['test', 'live'], true)
             && filled(config('services.xendit.secret_key'))
             && filled(config('services.xendit.webhook_token'));
-        $xenditEnabled = $providerConfigured && $sellerAccountsReady && $payoutConfigReady;
-        $xenditUnavailableReason = ! $providerConfigured
-            ? 'Administrator perlu mengatur kunci API, token webhook, dan mode Xendit.'
-            : (! $payoutConfigReady
-                ? 'Administrator perlu menetapkan persentase pencairan penjual di bawah 100% agar biaya transaksi memiliki saldo.'
-                : (! $sellerAccountsReady ? 'Setiap penjual harus terhubung ke sub-account XenPlatform yang sudah diverifikasi.' : null));
+        $providerConfigured = $paymentProviderConfigured;
+        $xenditEnabled = (bool) config('services.xendit.marketplace_enabled') && $providerConfigured;
+        $xenditUnavailableReason = ! config('services.xendit.marketplace_enabled')
+            ? 'Checkout Xendit dinonaktifkan oleh administrator.'
+            : (! $paymentProviderConfigured ? 'Administrator perlu mengatur kunci API Xendit, token webhook, dan mode test atau live.' : null);
 
         return view('marketplace.checkout', [
             'cart' => $cart,
             'requestKey' => Str::random(64),
             'xenditEnabled' => $xenditEnabled,
             'xenditUnavailableReason' => $xenditUnavailableReason,
-            'sellerPayoutPercent' => $payoutConfigReady ? number_format((float) $payoutPercent, 2, ',', '.') : null,
-            'platformRetainedPercent' => $payoutConfigReady ? number_format(100 - (float) $payoutPercent, 2, ',', '.') : null,
         ]);
     }
 
     public function checkout(MarketplaceCheckoutRequest $request, MarketplaceCheckoutService $service)
     {
+        if ($request->validated('payment_method') === 'xendit') {
+            abort_unless((bool) config('services.xendit.marketplace_enabled')
+                && in_array(config('services.xendit.mode'), ['test', 'live'], true)
+                && filled(config('services.xendit.secret_key'))
+                && filled(config('services.xendit.webhook_token')), 422, 'Checkout Xendit belum siap dikonfigurasi.');
+        }
         $group = $service->checkout($request->user(), $request->validated(), $request->validated('request_key'));
         $message = $request->validated('payment_method') === 'xendit'
-            ? 'Satu checkout dibuat untuk seluruh penjual. Selesaikan satu pembayaran Xendit; pesanan baru diteruskan setelah pembayaran dan seluruh alokasi penjual terverifikasi.'
+            ? 'Checkout dibuat. Selesaikan pembayaran melalui halaman aman Xendit; pesanan diteruskan setelah konfirmasi pembayaran diterima.'
             : 'Pesanan untuk tiap penjual berhasil dibuat. Pembayaran COD masih menunggu konfirmasi yang sah.';
 
         return to_route('marketplace.orders.group', $group)->with('status', $message);
@@ -462,22 +503,14 @@ class MarketplaceController extends Controller
         abort_unless($request->user()->hasRole('Super Admin'), 403);
 
         return view('admin.marketplace.xendit-seller-accounts', [
-            'sellers' => Seller::query()->with('user')->where('verification_status', 'approved')->orderBy('business_name')->paginate(25),
+            'mode' => config('services.xendit.mode'),
+            'credentialsConfigured' => filled(config('services.xendit.secret_key')) && filled(config('services.xendit.webhook_token')),
+            'payoutsReady' => (bool) config('services.xendit.payouts_enabled') && filled(config('services.xendit.payout_webhook_token')),
+            'checkoutReady' => (bool) config('services.xendit.marketplace_enabled')
+                && in_array(config('services.xendit.mode'), ['test', 'live'], true)
+                && filled(config('services.xendit.secret_key'))
+                && filled(config('services.xendit.webhook_token')),
         ]);
-    }
-
-    public function updateXenditSellerAccount(Request $request, Seller $seller, AuditLogger $audit)
-    {
-        abort_unless($request->user()->hasRole('Super Admin'), 403);
-        abort_unless($seller->verification_status === 'approved', 404);
-        $data = $request->validate([
-            'xendit_account_id' => ['nullable', 'string', 'max:80', 'regex:/^[A-Za-z0-9_-]+$/'],
-        ]);
-        $accountId = isset($data['xendit_account_id']) ? trim($data['xendit_account_id']) : null;
-        $seller->forceFill(['xendit_account_id' => $accountId === '' ? null : $accountId])->save();
-        $audit->record('marketplace.seller_xendit_account_updated', 'seller', (int) $seller->getKey(), ['configured' => $accountId !== null && $accountId !== '']);
-
-        return back()->with('status', $accountId ? 'Sub-account Xendit penjual disimpan.' : 'Sub-account Xendit penjual dilepas.');
     }
 
     public function reviewSeller(ReviewMarketplaceSellerRequest $request, Seller $seller, SellerOnboardingService $service)

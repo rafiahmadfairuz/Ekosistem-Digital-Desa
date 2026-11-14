@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['user_id', 'business_name', 'business_description', 'business_address', 'contact_phone', 'verification_status', 'xendit_account_id', 'reviewed_by', 'reviewed_at', 'rejection_reason'])]
 #[Hidden(['business_address', 'contact_phone', 'rejection_reason'])]
@@ -55,5 +56,20 @@ class Seller extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(SellerDocument::class);
+    }
+
+    public function payoutAccount(): HasOne
+    {
+        return $this->hasOne(SellerPayoutAccount::class);
+    }
+
+    public function balanceEntries(): HasMany
+    {
+        return $this->hasMany(SellerBalanceEntry::class);
+    }
+
+    public function withdrawals(): HasMany
+    {
+        return $this->hasMany(SellerWithdrawal::class);
     }
 }

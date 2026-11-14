@@ -50,7 +50,7 @@
                     </div>
                     <div>
                         <label for="password" class="block text-sm font-medium">Kata sandi</label>
-                        <input id="password" name="password" type="password" required autocomplete="current-password" class="mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-[#0A192F] focus-visible:border-[#059669] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#059669]">
+                        <div class="mt-2 flex min-h-11 rounded-lg border border-slate-300 bg-white focus-within:border-[#059669] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#059669]"><input id="password" name="password" type="password" required autocomplete="current-password" class="min-h-11 min-w-0 flex-1 rounded-l-lg bg-transparent px-3 py-2 text-base text-[#0A192F] focus-visible:outline-none"><button type="button" data-password-toggle="password" aria-controls="password" aria-pressed="false" class="min-h-11 min-w-11 px-3 text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#059669]">Lihat</button></div>
                     </div>
                     <label class="flex min-h-11 items-center gap-3 text-sm text-slate-700">
                         <input name="remember" type="checkbox" value="1" class="size-4 rounded border-slate-400 text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#059669]">

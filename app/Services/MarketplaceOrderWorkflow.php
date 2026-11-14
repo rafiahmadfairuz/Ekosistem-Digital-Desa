@@ -7,6 +7,8 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\PaymentEvent;
 use App\Models\Product;
+use App\Models\Seller;
+use App\Models\SellerBalanceEntry;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -166,6 +168,7 @@ class MarketplaceOrderWorkflow
             $delivery->events()->create(['actor_id' => $buyer->getKey(), 'from_status' => 'delivered', 'to_status' => 'confirmed', 'created_at' => now()]);
             $locked->forceFill(['status' => 'completed', 'completed_at' => now()])->save();
             $locked->statusEvents()->create(['actor_id' => $buyer->getKey(), 'from_status' => 'delivered', 'to_status' => 'completed', 'created_at' => now()]);
+            $this->creditSellerBalance($locked);
             $this->audit->record('marketplace.buyer_receipt_confirmed', 'order', (int) $locked->getKey());
             $this->notifier->toUser($locked->seller->user, 'Pesanan selesai', 'Pembeli telah mengonfirmasi penerimaan pesanan.', 'order', (int) $locked->getKey());
 
@@ -200,6 +203,9 @@ class MarketplaceOrderWorkflow
                 'signature_verified' => false,
                 'received_at' => now(),
             ]);
+            if ($lockedOrder->status === 'completed') {
+                $this->creditSellerBalance($lockedOrder);
+            }
             $this->audit->record('marketplace.cod_collection_confirmed', 'payment', (int) $lockedPayment->getKey(), ['order_id' => (int) $lockedOrder->getKey()]);
             $this->notifier->toUser($lockedOrder->buyer, 'Pembayaran COD dikonfirmasi', 'Pengumpulan pembayaran tunai untuk pesanan Anda telah dikonfirmasi.', 'order', (int) $lockedOrder->getKey());
 
@@ -212,6 +218,31 @@ class MarketplaceOrderWorkflow
         $from = $order->status;
         $order->forceFill(['status' => $status])->save();
         $order->statusEvents()->create(['actor_id' => $actor->getKey(), 'from_status' => $from, 'to_status' => $status, 'created_at' => now()]);
+    }
+
+    private function creditSellerBalance(Order $order): void
+    {
+        $seller = Seller::query()->whereKey($order->seller_id)->lockForUpdate()->firstOrFail();
+        $paymentIsPaid = Payment::query()->where('status', 'paid')->where(function ($query) use ($order): void {
+            $query->where('order_id', $order->getKey());
+            if ($order->checkout_group_id !== null) {
+                $query->orWhere('checkout_group_id', $order->checkout_group_id);
+            }
+        })->exists();
+        if (! $paymentIsPaid) {
+            return;
+        }
+
+        SellerBalanceEntry::query()->firstOrCreate(
+            ['order_id' => $order->getKey(), 'entry_type' => 'sale_earning'],
+            [
+                'seller_id' => $seller->getKey(),
+                'reference_id' => 'sale-order-'.$order->getKey(),
+                'amount' => $order->total_amount,
+                'currency' => 'IDR',
+                'description' => 'Pendapatan pesanan '.$order->order_number,
+            ]
+        );
     }
 
     private function restoreStock(Order $order, User $actor): void

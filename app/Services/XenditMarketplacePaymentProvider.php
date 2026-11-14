@@ -35,11 +35,10 @@ class XenditMarketplacePaymentProvider implements MarketplacePaymentProvider
 
     public function createPendingCheckoutGroupPayment(CheckoutGroup $group): Payment
     {
-        $group->loadMissing('orders.seller');
+        $group->loadMissing('orders');
         abort_unless($group->orders->isNotEmpty(), 409, 'Checkout tidak memiliki pesanan untuk dibayar.');
-        $payoutBasisPoints = $this->sellerPayoutBasisPoints();
 
-        $payment = Payment::query()->create([
+        return Payment::query()->create([
             'checkout_group_id' => $group->getKey(),
             'invoice_id' => null,
             'order_id' => null,
@@ -49,31 +48,6 @@ class XenditMarketplacePaymentProvider implements MarketplacePaymentProvider
             'platform_retained_amount' => '0.00',
             'status' => 'pending',
         ]);
-
-        $allocatedCents = 0;
-        $groupTotalCents = $this->toCents((string) $group->grand_total);
-        foreach ($group->orders as $order) {
-            $accountId = (string) $order->seller?->xendit_account_id;
-            abort_unless($accountId !== '', 409, 'Akun penjual belum terhubung ke Xendit XenPlatform.');
-            // Xendit split routes are IDR whole-rupiah amounts. Round each seller route down;
-            // the remaining rupiah stay with the platform along with the fee reserve.
-            $allocationCents = intdiv($this->toCents((string) $order->total_amount) * $payoutBasisPoints, 1_000_000) * 100;
-            abort_unless($allocationCents > 0, 422, 'Nilai pencairan penjual terlalu kecil setelah pembulatan.');
-            $allocatedCents += $allocationCents;
-            PaymentAllocation::query()->create([
-                'payment_id' => $payment->getKey(),
-                'order_id' => $order->getKey(),
-                'seller_id' => $order->seller_id,
-                'destination_account_id' => $accountId,
-                'route_reference' => 'alloc-'.$payment->getKey().'-'.$order->getKey(),
-                'amount' => $this->fromCents($allocationCents),
-                'status' => 'pending',
-            ]);
-        }
-        abort_unless($allocatedCents < $groupTotalCents, 422, 'Pembagian dana harus menyisakan saldo untuk biaya Xendit.');
-        $payment->forceFill(['platform_retained_amount' => $this->fromCents($groupTotalCents - $allocatedCents)])->save();
-
-        return $payment;
     }
 
     public function createOnlinePaymentSession(Payment $payment): Payment
@@ -96,13 +70,15 @@ class XenditMarketplacePaymentProvider implements MarketplacePaymentProvider
             $order = $lockedPayment->order;
             abort_unless(($group !== null && $order === null) || ($group === null && $order !== null), 409, 'Pembayaran harus terhubung ke tepat satu pesanan atau checkout.');
             if ($group !== null) {
-                abort_unless($group->orders->isNotEmpty() && $lockedPayment->allocations->isNotEmpty(), 409, 'Alokasi pembayaran penjual belum tersedia.');
-                $allocatedCents = $lockedPayment->allocations->sum(fn (PaymentAllocation $allocation): int => $this->toCents((string) $allocation->amount));
-                $totalCents = $this->toCents((string) $lockedPayment->amount);
-                $retainedCents = $this->toCents((string) $lockedPayment->platform_retained_amount);
-                abort_unless($allocatedCents > 0 && $allocatedCents + $retainedCents === $totalCents && $retainedCents > 0, 409, 'Alokasi penjual dan saldo cadangan platform harus sama dengan total checkout serta menyisakan biaya transaksi.');
-                foreach ($lockedPayment->allocations as $allocation) {
-                    abort_unless($allocation->destination_account_id !== '', 409, 'Akun tujuan pembayaran salah satu penjual belum terhubung.');
+                abort_unless($group->orders->isNotEmpty(), 409, 'Checkout tidak memiliki pesanan.');
+                if ($lockedPayment->allocations->isNotEmpty()) {
+                    $allocatedCents = $lockedPayment->allocations->sum(fn (PaymentAllocation $allocation): int => $this->toCents((string) $allocation->amount));
+                    $totalCents = $this->toCents((string) $lockedPayment->amount);
+                    $retainedCents = $this->toCents((string) $lockedPayment->platform_retained_amount);
+                    abort_unless($allocatedCents > 0 && $allocatedCents + $retainedCents === $totalCents && $retainedCents > 0, 409, 'Alokasi penjual dan saldo cadangan platform harus sama dengan total checkout serta menyisakan biaya transaksi.');
+                    foreach ($lockedPayment->allocations as $allocation) {
+                        abort_unless($allocation->destination_account_id !== '', 409, 'Akun tujuan pembayaran salah satu penjual belum terhubung.');
+                    }
                 }
             }
             $buyerId = $group?->buyer_id ?? $order?->buyer_id;
@@ -146,7 +122,7 @@ class XenditMarketplacePaymentProvider implements MarketplacePaymentProvider
                 $payload['cancel_return_url'] = $successUrl;
             }
 
-            if ($group !== null && $lockedPayment->xendit_split_rule_id === null) {
+            if ($group !== null && $lockedPayment->allocations->isNotEmpty() && $lockedPayment->xendit_split_rule_id === null) {
                 try {
                     $splitResponse = Http::withBasicAuth($secretKey, '')
                         ->acceptJson()
@@ -174,7 +150,7 @@ class XenditMarketplacePaymentProvider implements MarketplacePaymentProvider
                         'request_id' => $splitResponse->header('x-request-id') ?? $splitResponse->header('request-id'),
                     ]);
                     $message = match ($errorCode) {
-                        'REQUEST_FORBIDDEN_ERROR' => 'Akun atau kunci API belum diizinkan membuat split XenPlatform. Minta Xendit mengaktifkan fitur XenPlatform untuk akun Anda.',
+                        'REQUEST_FORBIDDEN_ERROR' => 'Akun atau kunci API belum diizinkan membuat split untuk transaksi lama.',
                         'DESTINATION_ACCOUNT_NOT_FOUND', 'INVALID_SOURCE_OR_DESTINATION_ERROR' => 'Business ID salah satu sub-account penjual tidak ditemukan atau tidak terhubung ke akun XenPlatform ini.',
                         'INVALID_FEE_AMOUNT', 'INSUFFICIENT_BALANCE' => 'Aturan split ditolak karena saldo cadangan mungkin tidak cukup untuk biaya Xendit. Sesuaikan persentase payout dengan biaya provider.',
                         default => 'Xendit belum dapat membuat pembagian dana. Periksa aktivasi XenPlatform, izin API, dan Business ID sub-account penjual.',
@@ -190,7 +166,7 @@ class XenditMarketplacePaymentProvider implements MarketplacePaymentProvider
                     ->acceptJson()
                     ->timeout((int) config('services.xendit.timeout', 10))
                     ->withHeader('Idempotency-Key', 'marketplace-payment-'.$lockedPayment->getKey());
-                if ($group !== null) {
+                if ($group !== null && $lockedPayment->xendit_split_rule_id !== null) {
                     $request = $request->withHeader('with-split-rule', (string) $lockedPayment->xendit_split_rule_id);
                 }
                 $response = $request->post(rtrim((string) config('services.xendit.base_url'), '/').'/sessions', $payload);
@@ -210,7 +186,7 @@ class XenditMarketplacePaymentProvider implements MarketplacePaymentProvider
                 $message = match ($errorCode) {
                     'INVALID_API_KEY' => 'Kunci API Xendit tidak valid atau tidak memiliki izin untuk membuat sesi pembayaran.',
                     'INVALID_COUNTRY', 'INVALID_CURRENCY', 'INVALID_AMOUNT', 'API_VALIDATION_ERROR' => 'Data pembayaran ditolak oleh validasi Xendit. Periksa konfigurasi produk dan pesanan, lalu coba kembali.',
-                    'REQUEST_FORBIDDEN_ERROR' => 'Akun atau kunci API Xendit belum diizinkan untuk Payment Session atau XenPlatform split. Minta Xendit mengaktifkan fitur tersebut untuk akun Anda.',
+                    'REQUEST_FORBIDDEN_ERROR' => 'Akun atau kunci API Xendit belum diizinkan membuat Payment Session. Minta Xendit mengaktifkan fitur tersebut untuk akun Anda.',
                     default => 'Xendit menolak pembuatan sesi pembayaran. Periksa mode dan izin kunci API; administrator dapat memeriksa kode error pada log.',
                 };
 
@@ -280,7 +256,7 @@ class XenditMarketplacePaymentProvider implements MarketplacePaymentProvider
             return null;
         }
 
-        $sessionId = $data['payment_session_id'] ?? null;
+        $sessionId = $data['payment_session_id'] ?? $data['id'] ?? null;
         $orderReference = $data['reference_id'] ?? null;
         $amount = $data['amount'] ?? null;
         $currency = $data['currency'] ?? null;
@@ -308,22 +284,6 @@ class XenditMarketplacePaymentProvider implements MarketplacePaymentProvider
             return -1;
         }
         [$whole, $fraction] = array_pad(explode('.', $amount, 2), 2, '0');
-
-        return ((int) $whole * 100) + (int) str_pad($fraction, 2, '0');
-    }
-
-    private function fromCents(int $amount): string
-    {
-        return intdiv($amount, 100).'.'.str_pad((string) ($amount % 100), 2, '0', STR_PAD_LEFT);
-    }
-
-    private function sellerPayoutBasisPoints(): int
-    {
-        $value = (string) config('services.xendit.marketplace_seller_payout_percent');
-        if (! preg_match('/^(?:\d{1,2})(?:\.\d{1,2})?$/', $value) || (float) $value <= 0 || (float) $value >= 100) {
-            throw ValidationException::withMessages(['payment_method' => 'Pembayaran Xendit multi-penjual belum dikonfigurasi. Administrator harus menetapkan persentase pencairan penjual di bawah 100% dan menyisakan saldo yang cukup untuk biaya transaksi.']);
-        }
-        [$whole, $fraction] = array_pad(explode('.', $value, 2), 2, '0');
 
         return ((int) $whole * 100) + (int) str_pad($fraction, 2, '0');
     }

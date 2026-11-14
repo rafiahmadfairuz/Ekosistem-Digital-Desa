@@ -54,9 +54,6 @@ class MarketplaceCheckoutService
                 if ($product->seller->verification_status !== 'approved' || $product->seller->user->account_status !== 'active') {
                     throw ValidationException::withMessages(['cart' => 'Penjual suatu produk sedang tidak dapat menerima pesanan.']);
                 }
-                if ($data['payment_method'] === 'xendit' && blank($product->seller->xendit_account_id)) {
-                    throw ValidationException::withMessages(['payment_method' => 'Pembayaran satu kali untuk beberapa penjual belum tersedia karena ada penjual yang belum terhubung ke akun Xendit XenPlatform. Pilih COD atau hubungi administrator.']);
-                }
                 $subtotal = $this->toCents((string) $product->price) * (int) $item->quantity;
                 if ($subtotal > 99_999_999_999_999) {
                     throw ValidationException::withMessages(['cart' => 'Total satu produk melampaui batas nilai pesanan.']);
@@ -112,7 +109,7 @@ class MarketplaceCheckoutService
                     'recipient_phone' => trim($data['recipient_phone']),
                     'delivery_status' => 'preparing',
                 ]);
-                if ($data['payment_method'] !== 'xendit') {
+                if ($data['payment_method'] === 'cod') {
                     $this->payments->createCashOnDeliveryPayment($order);
                     $this->notifier->toUser($sellerGroup['seller']->user, 'Pesanan baru', 'Ada pesanan baru yang menunggu keputusan Anda.', 'order', (int) $order->getKey());
                 }
@@ -121,7 +118,7 @@ class MarketplaceCheckoutService
             if ($data['payment_method'] === 'xendit') {
                 $this->payments->createPendingCheckoutGroupPayment($group);
             } else {
-                $this->notifier->toUser($buyer, 'Pesanan dibuat', 'Pesanan telah diteruskan ke penjual. Pembayaran COD tetap menunggu konfirmasi pengumpulan.', 'order', (int) $group->getKey());
+                $this->notifier->toUser($buyer, 'Pesanan dibuat', 'Pesanan telah diteruskan ke penjual. Pembayaran COD tetap menunggu konfirmasi pengumpulan.', 'checkout_group', (int) $group->getKey());
             }
 
             $cart->items()->delete();

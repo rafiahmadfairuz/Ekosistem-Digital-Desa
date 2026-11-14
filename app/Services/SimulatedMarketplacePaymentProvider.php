@@ -3,9 +3,9 @@
 namespace App\Services;
 
 use App\Contracts\MarketplacePaymentProvider;
+use App\Models\CheckoutGroup;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Models\CheckoutGroup;
 use App\Models\PaymentEvent;
 use Illuminate\Validation\ValidationException;
 
@@ -38,7 +38,7 @@ class SimulatedMarketplacePaymentProvider implements MarketplacePaymentProvider
 
     public function createPendingCheckoutGroupPayment(CheckoutGroup $group): Payment
     {
-        throw ValidationException::withMessages(['payment_method' => 'Pembayaran multi-penjual online belum dikonfigurasi. Pilih COD atau minta administrator mengaktifkan Xendit XenPlatform.']);
+        throw ValidationException::withMessages(['payment_method' => 'Checkout Xendit belum dikonfigurasi untuk akun ini. Pilih COD atau minta administrator mengatur kredensial Xendit.']);
     }
 
     public function createOnlinePaymentSession(Payment $payment): Payment

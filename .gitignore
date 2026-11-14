@@ -58,3 +58,12 @@ CODEX*.md
 **/CODEX*.md
 PHASE_*.md
 **/PHASE_*.md
+DOKUMENTASI-UI-TAILWIND.md
+
+# Local agent skills and generated reference bundles are not application source.
+/.agents/
+/.ai/
+/andrej-karpathy-skills/
+/desa-digital-images.tar
+/docs/erd-images.zip
+/docs/erd-images/

@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\CheckoutGroup;
 use App\Models\User;
+use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -47,5 +49,30 @@ class NotificationInboxTest extends TestCase
             ->assertOk()
             ->assertSee('Pemberitahuan')
             ->assertSee('1 belum dibaca');
+    }
+
+    public function test_marketplace_checkout_group_notification_opens_the_buyers_checkout(): void
+    {
+        $this->seed(RolesSeeder::class);
+        $buyer = User::factory()->active()->create();
+        $group = CheckoutGroup::query()->create([
+            'buyer_id' => $buyer->getKey(),
+            'checkout_number' => 'CHK-TEST-'.uniqid(),
+            'request_key' => str()->random(64),
+            'grand_total' => '100.00',
+            'status' => 'pending_seller',
+        ]);
+        $notificationId = DB::table('notifications')->insertGetId([
+            'user_id' => $buyer->getKey(),
+            'title' => 'Pesanan dibuat',
+            'message' => 'Pesanan diteruskan.',
+            'reference_type' => 'checkout_group',
+            'reference_id' => $group->getKey(),
+            'created_at' => now(),
+        ]);
+
+        $this->actingAs($buyer)
+            ->post(route('notifications.open', $notificationId))
+            ->assertRedirect(route('marketplace.orders.group', $group));
     }
 }

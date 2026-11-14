@@ -17,12 +17,12 @@
             <fieldset class="space-y-2 md:col-span-2"><legend class="font-semibold">Cara pembayaran</legend>
                 <label class="flex min-h-11 items-start gap-3 rounded-control border border-line p-3"><input type="radio" name="payment_method" value="cod" checked class="mt-1 size-5"><span><strong>Tunai saat barang diterima (COD)</strong><span class="block text-sm text-muted">Belum dibayar saat checkout; pembayaran dikonfirmasi setelah barang diserahkan dan uang diterima.</span></span></label>
                 @if($xenditEnabled)
-                    <label class="flex min-h-11 items-start gap-3 rounded-control border border-line p-3"><input type="radio" name="payment_method" value="xendit" class="mt-1 size-5"><span><strong>Xendit · {{ config('services.xendit.mode') === 'test' ? 'Mode uji' : 'Online' }}</strong><span class="block text-sm text-muted">Bayar sekali untuk semua penjual. Xendit mengirim alokasi {{ $sellerPayoutPercent }}% per pesanan ke sub-account penjual. {{ $platformRetainedPercent }}% masuk ke akun platform terlebih dahulu untuk menutup biaya provider; pastikan persentasenya sesuai biaya Xendit. Pesanan baru diteruskan setelah seluruh transfer split terkonfirmasi.</span></span></label>
+                    <label class="flex min-h-11 items-start gap-3 rounded-control border border-line p-3"><input type="radio" name="payment_method" value="xendit" class="mt-1 size-5"><span><strong>Xendit · {{ config('services.xendit.mode') === 'test' ? 'Mode uji' : 'Online' }}</strong><span class="block text-sm text-muted">Bayar sekali untuk seluruh checkout melalui halaman aman Xendit. Pesanan diteruskan setelah Xendit mengonfirmasi pembayaran.</span></span></label>
                 @else
                     <p class="rounded-control border border-line bg-canvas p-3 text-sm text-muted">Pembayaran Xendit belum tersedia. {{ $xenditUnavailableReason }}</p>
                 @endif
             </fieldset>
-            <p class="md:col-span-2 rounded-control bg-warning-bg p-4 text-sm leading-6 text-warning-ink">Jumlah pembayaran diverifikasi dari notifikasi server Xendit. Kembali dari halaman pembayaran tidak otomatis menandai pesanan lunas.</p>
+            <p class="md:col-span-2 rounded-control bg-warning-bg p-4 text-sm leading-6 text-warning-ink">Pembayaran Xendit masuk ke akun merchant yang terhubung dengan API key. Pencairan ke penjual tidak dilakukan otomatis oleh alur ini. COD dikonfirmasi setelah barang diserahkan dan uang diterima.</p>
             <div class="md:col-span-2"><x-ui.button type="submit">Buat pesanan</x-ui.button></div>
         </form>
     </main>

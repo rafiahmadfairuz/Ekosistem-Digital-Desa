@@ -17,6 +17,7 @@ use App\Http\Controllers\Bumdes\BusinessReportController;
 use App\Http\Controllers\CorrespondenceController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MarketplaceController;
+use App\Http\Controllers\MarketplacePayoutAccountController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ResidentProfileController;
 use App\Http\Controllers\ServicePortalController;
@@ -78,6 +79,11 @@ Route::middleware(['auth', 'account.active'])->group(function (): void {
         Route::post('/orders/{order}/cancel', [MarketplaceController::class, 'cancelOrder'])->name('orders.cancel');
         Route::post('/orders/{order}/receipt', [MarketplaceController::class, 'confirmReceipt'])->name('orders.receipt');
         Route::get('/seller/products', [MarketplaceController::class, 'sellerProducts'])->name('seller.products');
+        Route::get('/seller/payout-account', [MarketplacePayoutAccountController::class, 'edit'])->name('seller.payout-account.edit');
+        Route::put('/seller/payout-account', [MarketplacePayoutAccountController::class, 'store'])->name('seller.payout-account.update');
+        Route::post('/seller/withdrawals', [MarketplacePayoutAccountController::class, 'requestWithdrawal'])->middleware('throttle:service-request')->name('seller.withdrawals.store');
+        Route::get('/seller/products/archived', [MarketplaceController::class, 'archivedProducts'])->name('seller.products.archived');
+        Route::post('/seller/products/{product}/restore', [MarketplaceController::class, 'restoreProduct'])->name('seller.products.restore');
         Route::get('/seller/products/{product}/edit', [MarketplaceController::class, 'editProduct'])->name('seller.products.edit');
         Route::post('/seller/products', [MarketplaceController::class, 'storeProduct'])->name('seller.products.store');
         Route::put('/seller/products/{product}', [MarketplaceController::class, 'updateProduct'])->name('seller.products.update');
@@ -89,6 +95,8 @@ Route::middleware(['auth', 'account.active'])->group(function (): void {
         Route::post('/seller/orders/{order}/delivery', [MarketplaceController::class, 'updateDelivery'])->name('seller.orders.delivery');
         Route::post('/seller/payments/{payment}/cod-confirmation', [MarketplaceController::class, 'confirmCod'])->name('seller.payments.cod-confirmation');
         Route::get('/management/sellers', [MarketplaceController::class, 'sellerApplications'])->name('management.sellers');
+        Route::get('/management/payout-accounts', [MarketplacePayoutAccountController::class, 'managementIndex'])->name('management.payout-accounts');
+        Route::post('/management/payout-accounts/{account}/review', [MarketplacePayoutAccountController::class, 'review'])->name('management.payout-accounts.review');
         Route::post('/management/sellers/{seller}/review', [MarketplaceController::class, 'reviewSeller'])->name('management.sellers.review');
         Route::get('/management/sellers/{seller}/documents/{document}', [MarketplaceController::class, 'sellerDocument'])->name('management.sellers.documents.show');
         Route::get('/management/categories', [MarketplaceController::class, 'categories'])->name('management.categories');
@@ -100,7 +108,6 @@ Route::middleware(['auth', 'account.active'])->group(function (): void {
 
     Route::middleware('role:Super Admin')->prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/marketplace/xendit-seller-accounts', [MarketplaceController::class, 'xenditSellerAccounts'])->name('marketplace.xendit-seller-accounts.index');
-        Route::put('/marketplace/xendit-seller-accounts/{seller}', [MarketplaceController::class, 'updateXenditSellerAccount'])->name('marketplace.xendit-seller-accounts.update');
         Route::get('/users', [UserAccessController::class, 'index'])->name('users.manage');
         Route::get('/users/village-head/replacement', [UserAccessController::class, 'villageHeadReplacement'])->name('users.village-head.replacement');
         Route::put('/users/{user}/roles', [UserAccessController::class, 'updateRoles'])->name('users.roles.update');

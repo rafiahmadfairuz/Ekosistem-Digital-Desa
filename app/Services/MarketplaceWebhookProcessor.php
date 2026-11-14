@@ -3,11 +3,11 @@
 namespace App\Services;
 
 use App\Contracts\MarketplacePaymentProvider;
-use App\Models\Payment;
-use App\Models\PaymentEvent;
-use App\Models\PaymentAllocation;
-use App\Models\Order;
 use App\Models\OrderStatusEvent;
+use App\Models\Payment;
+use App\Models\PaymentAllocation;
+use App\Models\PaymentEvent;
+use App\Models\Product;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -78,8 +78,8 @@ class MarketplaceWebhookProcessor
                     $group = $payment->checkoutGroup()->lockForUpdate()->firstOrFail();
                     $group->forceFill(['status' => $verified['status'] === 'paid' ? 'settlement_pending' : 'payment_failed'])->save();
                     if ($verified['status'] === 'paid') {
-                        $this->publishGroupOrdersIfSplit($payment);
-                        $this->notifier->toUser($group->buyer, 'Pembayaran diterima', 'Pembayaran checkout diterima. Pesanan akan diteruskan setelah pembagian dana ke setiap penjual terkonfirmasi.', 'checkout_group', (int) $group->getKey());
+                        $this->publishPaidGroupOrders($payment);
+                        $this->notifier->toUser($group->buyer, 'Pembayaran diterima', 'Pembayaran checkout telah dikonfirmasi Xendit dan pesanan diteruskan kepada penjual.', 'checkout_group', (int) $group->getKey());
                     } else {
                         $this->cancelUnpaidGroup($payment);
                         $this->notifier->toUser($group->buyer, 'Pembayaran tidak selesai', 'Pembayaran checkout kedaluwarsa atau gagal. Stok telah dilepas dan penjual tidak menerima pesanan.', 'checkout_group', (int) $group->getKey());
@@ -147,7 +147,7 @@ class MarketplaceWebhookProcessor
                     $group = $payment->checkoutGroup()->with('buyer')->firstOrFail();
                     $this->notifier->toUser($group->buyer, 'Pembagian dana perlu ditinjau', 'Pembayaran diterima, tetapi pembagian dana ke salah satu penjual gagal. Pesanan belum diteruskan; hubungi pengelola untuk rekonsiliasi.', 'checkout_group', (int) $group->getKey());
                 } else {
-                    $this->publishGroupOrdersIfSplit($payment);
+                    $this->publishPaidGroupOrders($payment);
                 }
                 $this->audit->record('marketplace.payment_allocation_updated', 'payment_allocation', (int) $allocation->getKey(), ['status' => $verified['status']]);
 
@@ -162,10 +162,10 @@ class MarketplaceWebhookProcessor
         }
     }
 
-    private function publishGroupOrdersIfSplit(Payment $payment): void
+    private function publishPaidGroupOrders(Payment $payment): void
     {
         $payment->loadMissing('checkoutGroup.orders.seller.user', 'allocations');
-        if ($payment->status !== 'paid' || $payment->allocations->isEmpty() || $payment->allocations->contains(fn (PaymentAllocation $allocation): bool => $allocation->status !== 'completed')) {
+        if ($payment->status !== 'paid' || $payment->allocations->contains(fn (PaymentAllocation $allocation): bool => $allocation->status !== 'completed')) {
             return;
         }
         $group = $payment->checkoutGroup;
@@ -179,7 +179,7 @@ class MarketplaceWebhookProcessor
             }
             $order->forceFill(['status' => 'pending_seller'])->save();
             OrderStatusEvent::query()->create(['order_id' => $order->getKey(), 'actor_id' => null, 'from_status' => 'awaiting_payment', 'to_status' => 'pending_seller', 'created_at' => now()]);
-            $this->notifier->toUser($order->seller->user, 'Pesanan lunas siap diproses', 'Pembayaran checkout dan alokasi dana untuk pesanan Anda telah dikonfirmasi.', 'order', (int) $order->getKey());
+            $this->notifier->toUser($order->seller->user, 'Pesanan siap diproses', 'Pembayaran checkout telah dikonfirmasi Xendit.', 'order', (int) $order->getKey());
             $this->notifier->toUser($group->buyer, 'Pesanan diteruskan', 'Pesanan telah diteruskan kepada setiap penjual.', 'order', (int) $order->getKey());
         }
     }
@@ -194,7 +194,7 @@ class MarketplaceWebhookProcessor
             $order->forceFill(['status' => 'cancelled', 'cancellation_reason' => 'Pembayaran checkout tidak selesai.'])->save();
             OrderStatusEvent::query()->create(['order_id' => $order->getKey(), 'actor_id' => null, 'from_status' => 'awaiting_payment', 'to_status' => 'cancelled', 'reason' => 'Pembayaran checkout tidak selesai.', 'created_at' => now()]);
             foreach ($order->items as $item) {
-                $product = \App\Models\Product::query()->whereKey($item->product_id)->lockForUpdate()->first();
+                $product = Product::query()->whereKey($item->product_id)->lockForUpdate()->first();
                 if ($product !== null) {
                     $product->increment('stock', (int) $item->quantity);
                     if ($product->status === 'out_of_stock') {

@@ -39,6 +39,13 @@ class ProductPolicy
             && ! in_array($product->status, ['archived'], true);
     }
 
+    public function restore(User $user, Product $product): bool
+    {
+        return $this->owns($user, $product)
+            && $this->create($user)
+            && $product->status === 'archived';
+    }
+
     public function moderate(User $user): bool
     {
         return $this->isModerator($user);

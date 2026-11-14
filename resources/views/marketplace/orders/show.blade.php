@@ -51,7 +51,7 @@
                     <h2 class="text-lg font-semibold">Pembayaran</h2>
                     <p class="mt-2 font-medium">{{ $checkoutPayment?->payment_provider === 'xendit' ? 'Xendit · satu pembayaran checkout' : 'Tunai saat barang diterima (COD)' }}</p>
                     <p class="mt-1 text-sm">{{ $paymentLabels[$checkoutPayment?->status ?? 'pending'] ?? 'Status pembayaran' }}</p>
-                    <p class="mt-2 text-sm leading-6 text-muted">{{ $checkoutPayment?->payment_provider === 'xendit' ? 'Pembayaran mencakup seluruh pesanan pada checkout. Status lunas berasal dari notifikasi Xendit terverifikasi; penjual menerima pesanan setelah setiap alokasi dana dikonfirmasi.' : 'Pembeli tidak dapat mengubah status pembayaran. COD dicatat lunas hanya setelah penerimaan dan uang dikonfirmasi pihak berwenang.' }}</p>
+                    <p class="mt-2 text-sm leading-6 text-muted">{{ $checkoutPayment?->payment_provider === 'xendit' ? 'Pembayaran mencakup seluruh pesanan pada checkout. Status lunas berasal dari notifikasi Xendit terverifikasi; pesanan diteruskan setelah pembayaran terkonfirmasi.' : 'Pembeli tidak dapat mengubah status pembayaran. COD dicatat lunas hanya setelah penerimaan dan uang dikonfirmasi pihak berwenang.' }}</p>
                     @if(! $viewerIsSeller && $checkoutPayment?->payment_provider === 'xendit' && $checkoutPayment?->status === 'pending' && $order->status === 'awaiting_payment')
                         <form method="POST" action="{{ route('marketplace.orders.group.payment-session', $order->group) }}" class="mt-4">@csrf<x-ui.button type="submit">{{ $checkoutPayment->checkout_url ? 'Lanjutkan pembayaran checkout' : 'Bayar seluruh checkout dengan Xendit' }}</x-ui.button></form>
                     @endif

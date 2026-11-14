@@ -52,7 +52,17 @@ class RegionAssignmentController extends Controller
 
         $assignment = DB::transaction(function () use ($validated, $region, $role, $audit): RegionOfficer {
             $officer = User::query()->with('roles')->whereKey($validated['user_id'])->lockForUpdate()->firstOrFail();
-            abort_unless($officer->account_status === 'active' && $officer->roles->contains('name', $role), 422, 'Akun aktif harus memiliki peran yang sesuai dengan jenis wilayah.');
+            $roleNames = $officer->roles->pluck('name')->sort()->values()->all();
+            $allowedRoleSets = [
+                'RT' => [['RT'], ['RT', 'Resident']],
+                'RW' => [['RW'], ['RW', 'Resident']],
+            ];
+            abort_unless(
+                $officer->account_status === 'active'
+                    && in_array($roleNames, $allowedRoleSets[$role] ?? [], true),
+                422,
+                'Akun aktif harus memiliki peran yang sesuai dengan jenis wilayah.'
+            );
 
             $existing = RegionOfficer::query()->where('user_id', $officer->getKey())
                 ->where('region_id', $region->getKey())->where('is_active', true)->exists();

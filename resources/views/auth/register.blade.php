@@ -66,13 +66,13 @@
                     <div>
                         <label for="password" class="block text-base font-semibold">Kata sandi</label>
                         <p id="password-help" class="mt-1 text-sm leading-6 text-muted">Minimal 8 karakter, dengan huruf besar, huruf kecil, dan angka. Anda dapat menempelkan kata sandi.</p>
-                        <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password" aria-describedby="password-help @error('password') password-error @enderror" @error('password') aria-invalid="true" @enderror class="mt-2 min-h-12 w-full border border-slate-400 bg-white px-3 py-2 text-base text-ink focus-visible:border-brand">
+                        <div class="mt-2 flex min-h-12 rounded-control border border-slate-400 bg-white focus-within:border-brand focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand"><input id="password" name="password" type="password" required minlength="8" autocomplete="new-password" aria-describedby="password-help @error('password') password-error @enderror" @error('password') aria-invalid="true" @enderror class="min-h-12 min-w-0 flex-1 rounded-l-control bg-transparent px-3 py-2 text-base text-ink focus-visible:outline-none"><button type="button" data-password-toggle="password" aria-controls="password" aria-pressed="false" class="min-h-12 min-w-11 px-3 text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Lihat</button></div>
                         @error('password')<p id="password-error" class="mt-2 text-sm font-medium text-red-800">{{ $message }}</p>@enderror
                     </div>
 
                     <div>
                         <label for="password_confirmation" class="block text-base font-semibold">Ulangi kata sandi</label>
-                        <input id="password_confirmation" name="password_confirmation" type="password" required minlength="8" autocomplete="new-password" class="mt-2 min-h-12 w-full border border-slate-400 bg-white px-3 py-2 text-base text-ink focus-visible:border-brand">
+                        <div class="mt-2 flex min-h-12 rounded-control border border-slate-400 bg-white focus-within:border-brand focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand"><input id="password_confirmation" name="password_confirmation" type="password" required minlength="8" autocomplete="new-password" class="min-h-12 min-w-0 flex-1 rounded-l-control bg-transparent px-3 py-2 text-base text-ink focus-visible:outline-none"><button type="button" data-password-toggle="password_confirmation" aria-controls="password_confirmation" aria-pressed="false" class="min-h-12 min-w-11 px-3 text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Lihat</button></div>
                     </div>
 
                     <div>

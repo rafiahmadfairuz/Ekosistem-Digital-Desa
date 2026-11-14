@@ -37,6 +37,7 @@ class NotificationController extends Controller
             'letter_request' => route('correspondence.show', $record->reference_id),
             'installation_request', 'internet_subscription', 'subscription_invoice', 'service_request', 'payment' => route('services.index'),
             'assisted_service_session' => route('bumdes.assistance.show', $record->reference_id),
+            'checkout_group' => route('marketplace.orders.group', $record->reference_id),
             'product_category' => $request->user()->hasRole('BUMDes Manager')
                 ? route('marketplace.management.categories')
                 : route('marketplace.index'),

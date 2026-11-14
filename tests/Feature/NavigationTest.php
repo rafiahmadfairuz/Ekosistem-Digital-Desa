@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\BumdesStaff;
 use App\Models\Role;
+use App\Models\Seller;
 use App\Models\User;
 use App\Services\NavigationMenu;
 use Database\Seeders\RolesSeeder;
@@ -38,6 +39,31 @@ class NavigationTest extends TestCase
         $this->actingAs($resident)->get(route('marketplace.seller.application'))
             ->assertRedirect(route('profile.create'))
             ->assertSessionHas('status', 'Lengkapi profil warga dan pilih wilayah sebelum mendaftar sebagai penjual.');
+    }
+
+    public function test_marketplace_navigation_separates_buying_from_selling_and_keeps_balance_link_in_menu(): void
+    {
+        $this->seed(RolesSeeder::class);
+        $seller = $this->userWithRoles(['Resident', 'Seller']);
+        Seller::query()->create([
+            'user_id' => $seller->id,
+            'business_name' => 'Toko Uji',
+            'verification_status' => 'approved',
+        ]);
+
+        $groups = app(NavigationMenu::class)->for($seller);
+
+        $this->assertArrayHasKey('Pasar desa · Pembelian', $groups);
+        $this->assertArrayHasKey('Pasar desa · Penjual', $groups);
+        $this->assertSame([
+            'marketplace.index', 'marketplace.cart', 'marketplace.orders.index',
+        ], collect($groups['Pasar desa · Pembelian'])->pluck('route')->all());
+        $this->assertContains('marketplace.seller.payout-account.edit', collect($groups['Pasar desa · Penjual'])->pluck('route')->all());
+
+        $this->actingAs($seller)->get(route('marketplace.seller.products'))
+            ->assertOk()
+            ->assertSee('Saldo dan pendapatan')
+            ->assertDontSee('Saldo dan pendapatan toko');
     }
 
     public function test_multi_role_navigation_does_not_repeat_destinations(): void

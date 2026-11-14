@@ -107,6 +107,19 @@ class UserAccessController extends Controller
         DB::transaction(function () use ($user, $roleIds, $roles, $audit): void {
             $locked = User::query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
             $nextRoleNames = $roles->pluck('name');
+            $sortedRoleNames = $nextRoleNames->sort()->values()->all();
+            $allowedRoleSets = array_map(
+                fn (array $roleSet): array => collect($roleSet)->sort()->values()->all(),
+                [
+                    ['Super Admin'], ['BUMDes Manager'], ['BUMDes Operator'], ['Village Admin'],
+                    ['RT'], ['RW'], ['Resident'], ['Seller'], ['Village Head'],
+                    ['RT', 'Resident'], ['RW', 'Resident'],
+                ],
+            );
+            if (! in_array($sortedRoleNames, $allowedRoleSets, true)) {
+                throw ValidationException::withMessages(['role_ids' => 'Pilih satu peran, atau gunakan hanya kombinasi RT + Resident atau RW + Resident.']);
+            }
+
             if ($locked->roles()->whereIn('name', self::PROTECTED_ROLES)->exists()) {
                 throw ValidationException::withMessages(['role_ids' => 'Peran Super Admin atau Village Head pada akun ini dilindungi dan tidak dapat diubah dari halaman ini.']);
             }

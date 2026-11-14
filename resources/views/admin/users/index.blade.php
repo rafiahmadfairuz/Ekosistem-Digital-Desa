@@ -14,7 +14,7 @@
             @if($user->roles->contains(fn ($role) => in_array($role->name, ['Super Admin', 'Village Head'], true)))
                 <div class="min-w-0"><p class="text-sm font-semibold">Peran terlindungi</p><p class="mt-2 text-sm leading-6">{{ $user->roles->pluck('name')->intersect(['Super Admin', 'Village Head'])->implode(', ') }} · perubahan peran dilakukan melalui proses pergantian khusus.</p></div>
             @else
-                <form method="POST" action="{{ route('admin.users.roles.update', $user) }}" class="min-w-0">@csrf @method('PUT')<fieldset><legend class="text-sm font-semibold">Peran</legend><div class="mt-2 grid gap-x-3 gap-y-1 sm:grid-cols-2">@foreach($roles as $role)<label class="flex min-h-11 min-w-0 items-center gap-2 text-sm"><input class="size-4 shrink-0" type="checkbox" name="role_ids[]" value="{{ $role->id }}" @checked($user->roles->contains('id', $role->id))><span class="break-words">{{ $role->name }}</span></label>@endforeach</div></fieldset><p class="mt-2 text-xs leading-5 text-muted">Village Head hanya dapat diberikan jika akun aktif dan emailnya sudah diverifikasi.</p><button class="mt-3 min-h-11 bg-brand px-4 font-semibold text-ink">Simpan peran</button></form>
+                <form method="POST" action="{{ route('admin.users.roles.update', $user) }}" class="min-w-0" data-role-form>@csrf @method('PUT')<fieldset><legend class="text-sm font-semibold">Peran</legend><div class="mt-2 grid gap-x-3 gap-y-1 sm:grid-cols-2">@foreach($roles as $role)<label class="flex min-h-11 min-w-0 items-center gap-2 text-sm"><input class="size-4 shrink-0" type="checkbox" name="role_ids[]" value="{{ $role->id }}" data-role-name="{{ $role->name }}" @checked($user->roles->contains('id', $role->id))><span class="break-words">{{ $role->name }}</span></label>@endforeach</div></fieldset><p class="mt-2 text-xs leading-5 text-muted">Kombinasi multi-peran hanya diizinkan untuk RT + Resident atau RW + Resident. Kepala Desa harus menjadi satu-satunya peran.</p><button class="mt-3 min-h-11 bg-brand px-4 font-semibold text-ink">Simpan peran</button></form>
             @endif
             @if($user->account_status === 'pending')
                 <div class="text-sm leading-6 text-muted"><p>Akun menunggu aktivasi; perubahan status tersedia setelah email diverifikasi.</p><a class="mt-1 inline-flex min-h-11 items-center font-medium text-emerald-800 underline" href="{{ route('admin.users.index') }}">Buka aktivasi akun</a></div>
@@ -34,4 +34,34 @@
     @endforeach
     </div><div class="mt-5">{{ $users->links() }}</div>
 </main>
+<script>
+    document.querySelectorAll('[data-role-form]').forEach((form) => {
+        const checkboxes = [...form.querySelectorAll('input[name="role_ids[]"]')];
+        const villageHead = checkboxes.find((checkbox) => checkbox.dataset.roleName === 'Village Head');
+        const updateRoleOptions = (changedCheckbox) => {
+            if (villageHead?.checked) {
+                checkboxes.filter((checkbox) => checkbox !== villageHead).forEach((checkbox) => {
+                    checkbox.checked = false;
+                    checkbox.disabled = true;
+                });
+                return;
+            }
+
+            if (changedCheckbox?.checked && changedCheckbox !== villageHead && villageHead) {
+                villageHead.checked = false;
+            }
+
+            const hasOtherRole = checkboxes.some((checkbox) => checkbox !== villageHead && checkbox.checked);
+            if (villageHead) {
+                villageHead.disabled = hasOtherRole;
+            }
+            checkboxes.filter((checkbox) => checkbox !== villageHead).forEach((checkbox) => {
+                checkbox.disabled = false;
+            });
+        };
+
+        checkboxes.forEach((checkbox) => checkbox.addEventListener('change', () => updateRoleOptions(checkbox)));
+        updateRoleOptions(null);
+    });
+</script>
 </x-layouts.app>

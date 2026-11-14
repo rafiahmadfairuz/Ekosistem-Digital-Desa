@@ -1,6 +1,20 @@
 //
 import '@fontsource-variable/instrument-sans';
 
+document.querySelectorAll('[data-password-toggle]').forEach((toggleButton) => {
+    if (!(toggleButton instanceof HTMLButtonElement)) return;
+
+    const passwordField = document.getElementById(toggleButton.dataset.passwordToggle ?? '');
+    if (!(passwordField instanceof HTMLInputElement)) return;
+
+    toggleButton.addEventListener('click', () => {
+        const isPasswordVisible = passwordField.type === 'text';
+        passwordField.type = isPasswordVisible ? 'password' : 'text';
+        toggleButton.textContent = isPasswordVisible ? 'Lihat' : 'Sembunyikan';
+        toggleButton.setAttribute('aria-pressed', String(!isPasswordVisible));
+    });
+});
+
 const cartAddedToast = document.querySelector('[data-cart-added-toast]');
 
 const showCartToast = (title, description, success = true) => {

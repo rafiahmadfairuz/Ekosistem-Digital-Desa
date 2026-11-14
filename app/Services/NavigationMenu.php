@@ -34,7 +34,7 @@ class NavigationMenu
                 'label' => $hasResidentProfile ? 'Profil warga' : 'Lengkapi profil warga',
                 'route' => 'profile.show',
             ];
-            $groups['Pasar desa'] = [
+            $groups['Pasar desa · Pembelian'] = [
                 ['label' => 'Jelajahi produk', 'route' => 'marketplace.index'],
                 ['label' => 'Keranjang', 'route' => 'marketplace.cart'],
                 ['label' => 'Pesanan saya', 'route' => 'marketplace.orders.index'],
@@ -43,25 +43,26 @@ class NavigationMenu
                 $label = in_array($seller->verification_status, ['rejected', 'inactive'], true)
                     ? 'Perbaiki pengajuan penjual'
                     : ($seller->verification_status === 'suspended' ? 'Status penjual' : 'Status pengajuan penjual');
-                $groups['Pasar desa'][] = ['label' => $label, 'route' => 'marketplace.seller.application'];
+                $groups['Pasar desa · Penjual'][] = ['label' => $label, 'route' => 'marketplace.seller.application'];
             } elseif ($seller === null && $hasResidentProfile) {
-                $groups['Pasar desa'][] = ['label' => 'Daftar sebagai penjual', 'route' => 'marketplace.seller.application'];
+                $groups['Pasar desa · Penjual'][] = ['label' => 'Daftar sebagai penjual', 'route' => 'marketplace.seller.application'];
             }
         }
 
         if ($hasRole('Seller') && $user->seller()->exists()) {
             if ($user->seller->verification_status === 'approved') {
-                $groups['Pasar desa'][] = ['label' => 'Produk saya', 'route' => 'marketplace.seller.products'];
+                $groups['Pasar desa · Penjual'][] = ['label' => 'Produk saya', 'route' => 'marketplace.seller.products'];
+                $groups['Pasar desa · Penjual'][] = ['label' => 'Saldo dan pendapatan', 'route' => 'marketplace.seller.payout-account.edit'];
             }
-            $groups['Pasar desa'][] = ['label' => 'Pesanan toko', 'route' => 'marketplace.seller.orders'];
+            $groups['Pasar desa · Penjual'][] = ['label' => 'Pesanan toko', 'route' => 'marketplace.seller.orders'];
         }
 
         if ($hasRole('BUMDes Manager') && $user->bumdesStaff()->where('employment_status', 'active')->exists()) {
-            $groups['Pasar desa'] = array_merge($groups['Pasar desa'] ?? [], [
+            $groups['Pengelolaan pasar desa'] = [
                 ['label' => 'Pengajuan penjual', 'route' => 'marketplace.management.sellers'],
                 ['label' => 'Kategori produk', 'route' => 'marketplace.management.categories'],
                 ['label' => 'Moderasi produk', 'route' => 'marketplace.management.products'],
-            ]);
+            ];
         }
 
         if ($hasRole('Village Admin')) {
@@ -79,7 +80,7 @@ class NavigationMenu
             $groups['Akun dan akses'] = [
                 ['label' => 'Aktivasi akun', 'route' => 'admin.users.index'],
                 ['label' => 'Akun dan peran', 'route' => 'admin.users.manage'],
-                ['label' => 'Akun Xendit penjual', 'route' => 'admin.marketplace.xendit-seller-accounts.index'],
+                ['label' => 'Pembayaran Xendit marketplace', 'route' => 'admin.marketplace.xendit-seller-accounts.index'],
             ];
             $groups['Wilayah'] = array_merge($groups['Wilayah'] ?? [], [
                 ['label' => 'Data desa, RW, dan RT', 'route' => 'admin.regions.index'],

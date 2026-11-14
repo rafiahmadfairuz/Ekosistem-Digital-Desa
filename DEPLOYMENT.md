@@ -40,7 +40,7 @@ Enable Google 2-Step Verification and create an App Password for the application
 
 ## Xendit marketplace payments
 
-The marketplace can use the Xendit hosted Payment Sessions API in test mode. Each seller-specific order has its own payment session. The buyer can initiate payment only after that seller accepts; a browser return never marks an order paid. Only a valid server webhook changes payment status. Test mode remains opt-in; without credentials the application keeps the simulated adapter and COD.
+The marketplace keeps COD and offers Xendit hosted checkout when payment configuration is ready. Each checkout uses one Payment Session without XenPlatform split routes or seller Business IDs. Seller earnings are credited to an immutable ledger only after the order is completed and its payment is confirmed. Sellers can request a Xendit payout against that available ledger balance; the request reserves the amount before a queued payout job is sent. See `PAYMENT_INTEGRATION.md` for setup and activation requirements.
 
 Set these only in the private `.env` (or the secret store for a deployed environment):
 
@@ -48,13 +48,17 @@ Set these only in the private `.env` (or the secret store for a deployed environ
 MARKETPLACE_PAYMENT_MODE=test
 XENDIT_SECRET_KEY=xnd_development_replace_with_test_secret
 XENDIT_WEBHOOK_TOKEN=replace_with_test_webhook_verification_token
+XENDIT_PAYOUTS_ENABLED=true
+XENDIT_PAYOUT_WEBHOOK_TOKEN=replace_with_payout_webhook_verification_token
+XENDIT_PAYOUT_SOURCE_OF_FUND=BUSINESS_REVENUE
+XENDIT_PAYOUT_PURPOSE_CODE=TRADES
 XENDIT_BASE_URL=https://api.xendit.co
 XENDIT_TIMEOUT=10
 ```
 
-Use the **test/development** secret API key and webhook verification token from the Xendit Dashboard. Configure the Payment Session webhook destination to `https://your-public-host/api/marketplace/xendit/webhook`, then run a test checkout and complete payment with Xendit's test methods. A local app at `localhost` is not reachable by Xendit; use a temporary HTTPS tunnel only for sandbox work, or a secured staging host. Never use live credentials or expose port 3306 to receive webhooks. The endpoint verifies `x-callback-token`, the payment session reference, order reference, IDR currency, amount, and event idempotency.
+Use the **test/development** secret API key with Money In and Money Out permissions, plus callback tokens from the Xendit Dashboard. Configure payment and payout webhook destinations at `/api/marketplace/xendit/webhook` and `/api/marketplace/xendit/payout-webhook`. Sellers enter their bank SWIFT/BIC, account number, name and address; a BUMDes Manager verifies the destination before approving withdrawals. Use the database queue on the same database connection as the app and keep a queue worker running so withdrawal requests and reserved-balance ledger entries commit atomically before transfer processing. Run a test checkout, complete payment, complete an order, then request a withdrawal using Xendit's test methods. A local app at `localhost` is not reachable by Xendit; use a temporary HTTPS tunnel only for sandbox work, or a secured staging host. Never use live credentials or expose port 3306 to receive webhooks.
 
-After editing `.env`, clear cached configuration with `php artisan config:clear`. Do not put API credentials in Vite variables, Blade, source control, or the database. To enable live mode later, separately review Xendit account activation, live credentials, production webhook URL, legal/payment terms, refunds and reconciliation procedures, and then set `MARKETPLACE_PAYMENT_MODE=live` with the live secret/token. No live payment has been configured or tested by this implementation.
+After editing `.env`, clear cached configuration with `php artisan config:clear`. Do not put API credentials in Vite variables, Blade, source control, or the database. To enable live mode later, separately review Xendit account activation, Money Out permission, live credentials, production webhook URLs, approved source-of-funds and purpose codes, legal/payment terms, refunds and reconciliation procedures, and then set `MARKETPLACE_PAYMENT_MODE=live` with the live secret/tokens. No live payment or payout has been configured or tested by this implementation.
 
 ## Migration and cache sequence
 

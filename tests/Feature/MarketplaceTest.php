@@ -15,6 +15,8 @@ use App\Models\Region;
 use App\Models\Resident;
 use App\Models\Role;
 use App\Models\Seller;
+use App\Models\SellerPayoutAccount;
+use App\Models\SellerWithdrawal;
 use App\Models\User;
 use App\Models\Village;
 use App\Services\MarketplaceWebhookProcessor;
@@ -22,6 +24,7 @@ use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -58,12 +61,44 @@ class MarketplaceTest extends TestCase
         $this->assertSame(3, $productB->fresh()->stock);
         $this->assertDatabaseHas('payments', ['order_id' => $group->orders->first()->id, 'invoice_id' => null, 'status' => 'pending', 'payment_provider' => 'cod']);
         $this->assertDatabaseHas('deliveries', ['order_id' => $group->orders->first()->id, 'delivery_method' => 'delivery']);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $buyer->getKey(),
+            'reference_type' => 'checkout_group',
+            'reference_id' => $group->getKey(),
+        ]);
         $this->assertSame(0, CartItem::query()->count());
 
         $this->post(route('marketplace.checkout.store'), $checkout)->assertRedirect();
         $this->assertDatabaseCount('checkout_groups', 1);
         $this->assertDatabaseCount('orders', 2);
         $this->assertSame(4, $productA->fresh()->stock);
+    }
+
+    public function test_xendit_checkout_requires_credentials_and_no_transfer_fallback_is_offered(): void
+    {
+        config([
+            'services.xendit.marketplace_enabled' => true,
+            'services.xendit.mode' => 'simulated',
+            'services.xendit.secret_key' => null,
+            'services.xendit.webhook_token' => null,
+        ]);
+        $buyer = $this->userWithRoles(['Resident']);
+        [, $product] = $this->approvedSellerWithProduct('Toko Alternatif', 'Produk Alternatif', '10000.00', 2);
+        $this->actingAs($buyer)->post(route('marketplace.cart.add', $product), ['quantity' => 1])->assertRedirect();
+        $this->get(route('marketplace.checkout'))
+            ->assertOk()
+            ->assertDontSee('value="manual_transfer"', false)
+            ->assertSee('Pembayaran Xendit belum tersedia')
+            ->assertSee('Administrator perlu mengatur kunci API Xendit');
+
+        $this->post(route('marketplace.checkout.store'), [
+            'delivery_method' => 'pickup',
+            'recipient_name' => 'Pembeli Uji',
+            'recipient_phone' => '08123456789',
+            'request_key' => Str::random(64),
+            'payment_method' => 'xendit',
+        ])->assertSessionHasErrors('payment_method');
+        $this->assertDatabaseCount('checkout_groups', 0);
     }
 
     public function test_add_to_cart_returns_to_product_page_with_confirmation(): void
@@ -203,6 +238,34 @@ class MarketplaceTest extends TestCase
         $this->actingAs($pending)->post(route('marketplace.seller.products.store'), [])->assertForbidden();
     }
 
+    public function test_seller_can_restore_only_their_archived_product(): void
+    {
+        [$seller, $product] = $this->approvedSellerWithProduct('Toko Arsip', 'Produk A', '12000.00', 3);
+        [, $otherProduct] = $this->approvedSellerWithProduct('Toko Lain', 'Produk B', '14000.00', 3);
+        $product->forceFill(['status' => 'archived'])->save();
+        $product->moderationEvents()->create([
+            'actor_id' => $seller->getKey(), 'from_status' => 'active', 'to_status' => 'archived', 'created_at' => now(),
+        ]);
+        $otherProduct->forceFill(['status' => 'archived'])->save();
+        $otherProduct->moderationEvents()->create([
+            'actor_id' => $otherProduct->seller->user_id, 'from_status' => 'active', 'to_status' => 'archived', 'created_at' => now(),
+        ]);
+
+        $this->actingAs($seller)->get(route('marketplace.seller.products'))
+            ->assertOk()->assertDontSee('Produk A')->assertSee('Produk toko saya');
+        $this->get(route('marketplace.seller.products.archived'))->assertOk()->assertSee('Produk A');
+        $this->post(route('marketplace.seller.products.restore', $product))
+            ->assertRedirect(route('marketplace.seller.products'));
+
+        $this->assertSame('active', $product->fresh()->status);
+        $this->assertSame('archived', $otherProduct->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'marketplace.product_restored', 'entity_id' => $product->getKey()]);
+        $this->assertDatabaseHas('product_moderation_events', ['product_id' => $product->getKey(), 'from_status' => 'archived', 'to_status' => 'active']);
+
+        $otherSeller = $otherProduct->seller->user;
+        $this->actingAs($otherSeller)->post(route('marketplace.seller.products.restore', $product))->assertForbidden();
+    }
+
     public function test_seller_application_requires_an_authorized_reviewer_and_approval_grants_seller_role(): void
     {
         $applicant = $this->userWithRoles(['Resident']);
@@ -264,9 +327,59 @@ class MarketplaceTest extends TestCase
         $this->assertSame('pending', $payment->fresh()->status);
         $this->actingAs($buyer)->post(route('marketplace.orders.receipt', $order))->assertRedirect();
         $this->assertSame('pending', $payment->fresh()->status);
+        $this->assertDatabaseCount('seller_balance_entries', 0);
         $this->actingAs($seller)->post(route('marketplace.seller.payments.cod-confirmation', $payment->fresh()))->assertRedirect();
         $this->assertSame('paid', $payment->fresh()->status);
         $this->assertDatabaseHas('payment_events', ['payment_id' => $payment->id, 'event_type' => 'cod.collection_confirmed', 'signature_verified' => 0]);
+        $this->assertDatabaseHas('seller_balance_entries', ['seller_id' => $seller->seller->id, 'order_id' => $order->id, 'entry_type' => 'sale_earning', 'amount' => '30000.00']);
+
+        config([
+            'services.xendit.marketplace_enabled' => true,
+            'services.xendit.mode' => 'test',
+            'services.xendit.secret_key' => 'xnd_test_fake_secret',
+            'services.xendit.payouts_enabled' => true,
+            'services.xendit.payout_webhook_token' => 'test-payout-callback-token',
+        ]);
+        Queue::fake();
+        SellerPayoutAccount::query()->create([
+            'seller_id' => $seller->seller->id,
+            'bank_name' => 'Bank Central Asia',
+            'bank_swift_code' => 'CENAIDJA',
+            'account_holder_name' => 'Seller Recipient',
+            'account_number' => '1234567890',
+            'recipient_address' => 'Jalan Desa Nomor 1',
+            'recipient_type' => 'INDIVIDUAL',
+            'status' => 'verified',
+        ]);
+        $requestKey = (string) Str::uuid();
+        $withdrawalRequest = ['request_key' => $requestKey, 'amount' => 30000];
+        $this->actingAs($seller)->get(route('marketplace.seller.payout-account.edit'))->assertOk()->assertSee('Saldo tersedia')->assertSee('Rp30.000');
+        $this->post(route('marketplace.seller.withdrawals.store'), $withdrawalRequest)->assertRedirect();
+        $this->assertSame('0.00', number_format((float) $seller->seller->balanceEntries()->sum('amount'), 2, '.', ''));
+        $this->assertDatabaseCount('seller_withdrawals', 1);
+        $this->post(route('marketplace.seller.withdrawals.store'), $withdrawalRequest)->assertRedirect();
+        $this->assertDatabaseCount('seller_withdrawals', 1);
+        $this->assertDatabaseCount('seller_balance_entries', 2);
+        $withdrawal = SellerWithdrawal::query()->firstOrFail();
+        $withdrawal->forceFill(['xendit_payout_id' => 'po-cod-test', 'status' => 'accepted'])->save();
+        $payoutWebhook = [
+            'event' => 'v3_payout.failed',
+            'created' => now()->toIso8601String(),
+            'data' => [
+                'payout_id' => 'po-cod-test',
+                'reference_id' => $withdrawal->reference_id,
+                'status' => 'FAILED',
+                'source_currency' => 'IDR',
+                'source_amount' => 30000,
+                'destination_currency' => 'IDR',
+                'failure_code' => 'INVALID_DESTINATION',
+            ],
+        ];
+        $this->postJson('/api/marketplace/xendit/payout-webhook', $payoutWebhook, ['x-callback-token' => 'invalid'])->assertForbidden();
+        $this->postJson('/api/marketplace/xendit/payout-webhook', $payoutWebhook, ['x-callback-token' => 'test-payout-callback-token'])->assertNoContent();
+        $this->assertSame('30000.00', number_format((float) $seller->seller->balanceEntries()->sum('amount'), 2, '.', ''));
+        $this->postJson('/api/marketplace/xendit/payout-webhook', $payoutWebhook, ['x-callback-token' => 'test-payout-callback-token'])->assertNoContent();
+        $this->assertDatabaseCount('seller_balance_entries', 3);
     }
 
     public function test_verified_gateway_events_validate_amount_and_are_idempotent(): void
@@ -290,6 +403,11 @@ class MarketplaceTest extends TestCase
             }
 
             public function createPendingGatewayPayment(Order $order): Payment
+            {
+                throw new \LogicException('Not used in this webhook test.');
+            }
+
+            public function createPendingCheckoutGroupPayment(CheckoutGroup $group): Payment
             {
                 throw new \LogicException('Not used in this webhook test.');
             }
@@ -335,16 +453,16 @@ class MarketplaceTest extends TestCase
         }
     }
 
-    public function test_xendit_multiseller_checkout_is_one_payment_and_orders_are_hidden_until_every_split_is_verified(): void
+    public function test_xendit_checkout_uses_one_hosted_payment_without_xenplatform_splits(): void
     {
+        Queue::fake();
         config([
+            'services.xendit.marketplace_enabled' => true,
             'services.xendit.mode' => 'test',
             'services.xendit.secret_key' => 'xnd_test_fake_secret',
             'services.xendit.webhook_token' => 'test-callback-token',
-            'services.xendit.marketplace_seller_payout_percent' => '90.00',
         ]);
         Http::fake([
-            'https://api.xendit.co/split_rules' => Http::response(['id' => 'splitru-test-123'], 200),
             'https://api.xendit.co/sessions' => Http::response([
                 'payment_session_id' => 'ps-661f87c614802d6c402cd82d',
                 'payment_link_url' => 'https://checkout-staging.xendit.co/sessions/ps-661f87c614802d6c402cd82d',
@@ -355,10 +473,13 @@ class MarketplaceTest extends TestCase
         $buyer = $this->userWithRoles(['Resident']);
         [$sellerA, $productA] = $this->approvedSellerWithProduct('Test Xendit seller A', 'Teh lokal', '2999.00', 4);
         [$sellerB, $productB] = $this->approvedSellerWithProduct('Test Xendit seller B', 'Kopi lokal', '1001.00', 4);
-        $sellerA->seller->forceFill(['xendit_account_id' => 'sub-account-test-a'])->save();
-        $sellerB->seller->forceFill(['xendit_account_id' => 'sub-account-test-b'])->save();
         $this->actingAs($buyer)->post(route('marketplace.cart.add', $productA), ['quantity' => 1])->assertRedirect();
         $this->post(route('marketplace.cart.add', $productB), ['quantity' => 1])->assertRedirect();
+        $this->get(route('marketplace.checkout'))
+            ->assertOk()
+            ->assertSee('value="xendit"', false)
+            ->assertDontSee('value="manual_transfer"', false)
+            ->assertSee('Bayar sekali untuk seluruh checkout melalui halaman aman Xendit.');
         $this->post(route('marketplace.checkout.store'), [
             'delivery_method' => 'pickup',
             'payment_method' => 'xendit',
@@ -371,19 +492,16 @@ class MarketplaceTest extends TestCase
         $payment = $group->payment;
         $this->assertSame(2, $group->orders->count());
         $this->assertSame('4000.00', $payment->amount);
-        $this->assertSame('401.00', $payment->platform_retained_amount);
-        $this->assertSame(['900.00', '2699.00'], $payment->allocations->pluck('amount')->sort()->values()->all());
-        $this->assertSame(400000, (int) round(((float) $payment->allocations->sum('amount') + (float) $payment->platform_retained_amount) * 100));
+        $this->assertSame('0.00', $payment->platform_retained_amount);
+        $this->assertCount(0, $payment->allocations);
         $this->assertSame(1, Payment::query()->where('checkout_group_id', $group->id)->count());
         $this->assertSame('pending', $payment->status);
         $this->assertSame('xendit', $payment->payment_provider);
         $this->assertSame('awaiting_payment', $group->orders[0]->status);
         $this->actingAs($buyer)->get(route('marketplace.orders.group', $group))
             ->assertOk()
-            ->assertSee('Rincian pembagian pembayaran')
-            ->assertSee('Rp2.699')
-            ->assertSee('Rp900')
-            ->assertSee('Rp401');
+            ->assertSee('Bayar seluruh pesanan dengan Xendit')
+            ->assertDontSee('Rincian pembagian pembayaran');
         $this->actingAs($sellerA)->get(route('marketplace.seller.orders'))->assertOk()->assertDontSee($group->orders[0]->order_number);
         $this->actingAs($sellerA)->get(route('marketplace.orders.show', $group->orders[0]))->assertForbidden();
         $otherBuyer = $this->userWithRoles(['Resident']);
@@ -391,16 +509,13 @@ class MarketplaceTest extends TestCase
 
         $this->actingAs($buyer)->post(route('marketplace.orders.group.payment-session', $group))
             ->assertRedirect('https://checkout-staging.xendit.co/sessions/ps-661f87c614802d6c402cd82d');
-        Http::assertSent(fn ($request): bool => $request->url() === 'https://api.xendit.co/split_rules'
-            && array_sum(array_column($request['routes'], 'flat_amount')) === 3599
-            && count($request['routes']) === 2
-            && collect($request['routes'])->pluck('destination_account_id')->sort()->values()->all() === ['sub-account-test-a', 'sub-account-test-b']);
+        Http::assertNotSent(fn ($request): bool => str_ends_with($request->url(), '/split_rules'));
         Http::assertSent(fn ($request): bool => $request->url() === 'https://api.xendit.co/sessions'
             && $request['reference_id'] === $group->checkout_number
             && $request['amount'] === 4000
             && $request['currency'] === 'IDR'
             && $request['items'][0]['category'] === 'Makanan'
-            && $request->hasHeader('with-split-rule', 'splitru-test-123')
+            && ! $request->hasHeader('with-split-rule')
             && ! isset($request['customer']));
         $this->assertSame('ps-661f87c614802d6c402cd82d', $payment->fresh()->provider_reference);
 
@@ -419,36 +534,15 @@ class MarketplaceTest extends TestCase
         $this->assertSame('pending', $payment->fresh()->status);
         $this->postJson('/api/marketplace/xendit/webhook', $webhook, ['x-callback-token' => 'test-callback-token'])->assertNoContent();
         $this->assertSame('paid', $payment->fresh()->status);
-        $this->assertSame('settlement_pending', $group->fresh()->status);
-        $this->actingAs($sellerA)->get(route('marketplace.seller.orders'))->assertOk()->assertDontSee($group->orders[0]->order_number);
-
-        foreach ($payment->fresh()->allocations as $allocation) {
-            $splitWebhook = [
-                'event' => 'split.payment',
-                'data' => [
-                    'id' => 'split-payment-'.$allocation->id,
-                    'split_rule_id' => 'splitru-test-123',
-                    'reference_id' => $allocation->route_reference,
-                    'payment_reference_id' => $group->checkout_number,
-                    'destination_account_id' => $allocation->destination_account_id,
-                    'status' => 'COMPLETED',
-                    'amount' => (float) $allocation->amount,
-                    'currency' => 'IDR',
-                ],
-            ];
-            $this->postJson('/api/marketplace/xendit/webhook', $splitWebhook, ['x-callback-token' => 'test-callback-token'])->assertNoContent();
-        }
-
         $this->assertSame('pending_seller', $group->fresh()->status);
+        $this->assertDatabaseCount('seller_balance_entries', 0);
         $this->assertDatabaseMissing('orders', ['id' => $group->orders[0]->id, 'status' => 'awaiting_payment']);
         $this->actingAs($sellerA)->get(route('marketplace.seller.orders'))->assertOk()->assertSee($group->orders[0]->order_number);
         $this->actingAs($buyer)->get(route('marketplace.orders.group.receipt', $group))
             ->assertOk()
-            ->assertSee('Pembagian pembayaran Xendit')
-            ->assertSee('Dikonfirmasi Xendit')
-            ->assertSee('Saldo platform sebelum biaya Xendit');
+            ->assertDontSee('Pembagian pembayaran Xendit');
         $this->postJson('/api/marketplace/xendit/webhook', $webhook, ['x-callback-token' => 'test-callback-token'])->assertNoContent();
-        $this->assertDatabaseCount('payment_events', 4);
+        $this->assertDatabaseCount('payment_events', 2);
     }
 
     public function test_catalog_cart_application_seller_and_manager_pages_render(): void
