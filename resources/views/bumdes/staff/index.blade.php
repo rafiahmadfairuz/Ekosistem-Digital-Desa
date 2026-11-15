@@ -40,10 +40,10 @@
                         <select class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3.5 text-sm text-slate-900 shadow-2xs transition focus:border-emerald-600 focus:outline-none focus:ring-3 focus:ring-emerald-600/15" name="user_id" id="user_id" required>
                             <option value="">Pilih akun pengguna yang sudah memiliki peran BUMDes…</option>
                             @foreach($eligibleUsers as $user)
-                                <option value="{{ $user->id }}">{{ $user->username }} · {{ $user->roles->pluck('name')->intersect(['BUMDes Manager','BUMDes Operator'])->implode(', ') }}</option>
+                                <option value="{{ $user->id }}">{{ $user->username }} · {{ $user->roles->whereIn('name', ['BUMDes Manager','BUMDes Operator'])->map(fn ($role) => \App\Models\Role::displayName($role->name))->implode(', ') }}</option>
                             @endforeach
                         </select>
-                        <p class="mt-1.5 text-xs text-slate-500">Hanya akun dengan peran BUMDes Manager atau BUMDes Operator yang dapat didaftarkan sebagai staf.</p>
+                        <p class="mt-1.5 text-xs text-slate-500">Hanya akun dengan peran Pengelola BUMDes atau Operator BUMDes yang dapat didaftarkan sebagai staf.</p>
                     </div>
 
                     <div>
@@ -93,7 +93,7 @@
                         </span>
                         <div class="min-w-0 flex-1">
                             <h2 class="break-words text-lg font-bold text-slate-900">{{ $person->user->username }}</h2>
-                            <p class="mt-1 text-xs font-medium text-slate-500">Peran: <span class="text-slate-700 font-semibold">{{ $person->user->roles->pluck('name')->implode(', ') }}</span></p>
+                            <p class="mt-1 text-xs font-medium text-slate-500">Peran: <span class="text-slate-700 font-semibold">{{ $person->user->roles->map(fn ($role) => \App\Models\Role::displayName($role->name))->implode(', ') }}</span></p>
                             @if($person->joined_at)
                                 <p class="mt-0.5 text-xs text-slate-500">Bergabung: <span class="text-slate-700 font-medium">{{ \Illuminate\Support\Carbon::parse($person->joined_at)->format('d M Y') }}</span></p>
                             @endif

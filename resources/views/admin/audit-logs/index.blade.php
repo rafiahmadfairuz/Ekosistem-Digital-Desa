@@ -179,7 +179,7 @@
         <header class="max-w-3xl">
             <p class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-600">
                 <span class="size-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
-                <span>Akses terbatas · Super Admin</span>
+                <span>Akses terbatas · Administrator Utama</span>
             </p>
             <h1 class="mt-1.5 text-2xl font-bold tracking-tight text-slate-800">Log audit</h1>
             <p class="mt-1.5 text-sm leading-relaxed text-slate-500">

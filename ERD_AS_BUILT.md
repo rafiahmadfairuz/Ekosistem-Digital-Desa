@@ -1,6 +1,6 @@
 # ERD Implementasi — Integrated Village Digital Platform
 
-Dokumen ini menggambarkan struktur yang dibentuk oleh **54 tabel pada migration Laravel saat ini**, dikelompokkan per domain agar hubungan antartabel tetap terbaca seperti diagram referensi. Kolom kunci ditampilkan di kotak entitas; kolom audit/timestamp standar yang berulang disingkat.
+Dokumen ini menggambarkan **58 tabel bisnis/infrastruktur yang didefinisikan oleh migration Laravel** per 15 November 2026. Hubungan domain dipisahkan agar diagram terbaca; kolom audit/timestamp standar yang berulang disingkat. Pemilik melaporkan 60 tabel pada database aktif; perbedaan jumlah runtime dengan tabel migration-defined perlu direkonsiliasi.
 
 ## Daftar gambar ERD
 
@@ -15,9 +15,10 @@ Gambar tersedia dalam PNG untuk dibagikan dan SVG untuk diperbesar tanpa pecah. 
 
 ## Sumber dan batas verifikasi
 
-- Sumber ERD: definisi `database/migrations`, termasuk migration lanjutan sampai `2026_11_10_130000_add_marketplace_group_payments_and_split_allocations.php`.
-- Upaya membaca metadata database aktif dengan `php artisan db:show` pada 12 November 2026 gagal karena koneksi database menghasilkan `SQLSTATE[HY000] [2002] Unknown error while connecting`.
-- Karena itu, ini adalah ERD **migration-defined**, bukan hasil introspeksi langsung database server. Cocokkan kembali dengan `information_schema` setelah koneksi database tersedia sebelum menganggapnya sebagai snapshot database aktif.
+- Sumber ERD: definisi `database/migrations` sampai migration seller payout tanggal 13 November 2026.
+- Pada 14 November 2026, pemilik melaporkan output `php artisan db:show --counts`: MariaDB 13.0.2, database `desa_digital`, 60 tabel. Migration repository saat ini mendefinisikan 58 tabel; selain tabel bookkeeping `migrations`, terdapat selisih satu tabel aktif yang belum dicocokkan dengan `information_schema`.
+- Semua migration pada `php artisan migrate:status` dilaporkan berstatus `Ran`; migration status dibaca tanpa menjalankan migration.
+- `ERD.md` tetap dokumen desain awal; `ERD_AS_BUILT.md` menggambarkan migration yang terealisasi. Jika skema runtime berbeda, cek `information_schema` pada server yang dimaksud.
 - `ERD.md` tetap menjadi dokumen desain/logical requirements yang sudah ada; dokumen ini memisahkan ERD implementasi agar rancangan lama tidak tertimpa.
 
 ## Ikhtisar domain
@@ -28,6 +29,7 @@ Gambar tersedia dalam PNG untuk dibagikan dan SVG untuk diperbesar tanpa pecah. 
 | Persuratan | `letter_types`, `letter_requests`, `letter_request_versions`, `letter_approvals`, `letter_attachments`, `letter_documents` |
 | Internet dan Wi-Fi | `internet_packages`, `wifi_networks`, `network_devices`, `installation_requests`, `installation_request_events`, `internet_subscriptions`, `subscription_invoices`, `service_requests`, `wifi_access_logs` |
 | Pasar desa dan transaksi | `sellers`, `seller_status_events`, `seller_documents`, `product_categories`, `products`, `product_images`, `product_moderation_events`, `carts`, `cart_items`, `checkout_groups`, `orders`, `order_items`, `order_status_events`, `deliveries`, `delivery_events`, `payments`, `payment_events`, `payment_allocations` |
+| Saldo dan payout seller | `seller_payout_accounts`, `seller_withdrawals`, `seller_balance_entries`, `seller_withdrawal_events` |
 | Operasional BUMDes dan sistem | `assisted_service_sessions`, `assisted_service_logs`, `assisted_service_messages`, `business_expenses`, `notifications`, `audit_logs` |
 | Infrastruktur Laravel | `password_reset_tokens`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs` |
 
@@ -421,7 +423,63 @@ erDiagram
 
 **Catatan constraint pembayaran:** migration awal menambahkan check agar tepat satu target pembayaran terisi. Migration marketplace memperluasnya menjadi tepat satu dari `order_id`, `invoice_id`, atau `checkout_group_id`. `checkout_group_id` dibuat unique sehingga paling banyak satu record pembayaran grup per checkout. `payment_events` menyimpan event provider; `payment_allocations` mencatat alokasi tiap pesanan penjual.
 
-## 5. Bantuan digital, operasional, dan audit
+## 5. Saldo, rekening payout, dan pencairan penjual
+
+```mermaid
+erDiagram
+    SELLERS ||--o| SELLER_PAYOUT_ACCOUNTS : owns_destination
+    USERS o|--o{ SELLER_PAYOUT_ACCOUNTS : reviews
+    SELLERS ||--o{ SELLER_WITHDRAWALS : requests
+    SELLER_PAYOUT_ACCOUNTS o|--o{ SELLER_WITHDRAWALS : destination_snapshot_source
+    SELLERS ||--o{ SELLER_BALANCE_ENTRIES : ledger
+    ORDERS o|--o{ SELLER_BALANCE_ENTRIES : earns_from
+    SELLER_WITHDRAWALS o|--o{ SELLER_BALANCE_ENTRIES : reserves_or_releases
+    SELLER_WITHDRAWALS ||--o{ SELLER_WITHDRAWAL_EVENTS : provider_events
+
+    SELLER_PAYOUT_ACCOUNTS {
+        bigint id PK
+        bigint seller_id FK_UK
+        string bank_name
+        string bank_swift_code
+        text account_number_encrypted
+        string status
+        bigint reviewed_by FK
+    }
+    SELLER_WITHDRAWALS {
+        bigint id PK
+        bigint seller_id FK
+        bigint seller_payout_account_id FK
+        string request_key UK
+        string reference_id UK
+        string xendit_payout_id UK
+        decimal amount
+        string status
+        text account_snapshot_encrypted
+    }
+    SELLER_BALANCE_ENTRIES {
+        bigint id PK
+        bigint seller_id FK
+        bigint order_id FK
+        bigint seller_withdrawal_id FK
+        string entry_type
+        string reference_id UK
+        decimal amount
+        string currency
+    }
+    SELLER_WITHDRAWAL_EVENTS {
+        bigint id PK
+        bigint seller_withdrawal_id FK
+        string event_type
+        string event_reference UK
+        json payload
+        boolean signature_verified
+        timestamp received_at
+    }
+```
+
+`seller_payout_accounts` menyimpan satu tujuan payout per seller dengan status review. Withdrawal menyimpan snapshot rekening dan request/reference idempotensi. Ledger adalah sumber perhitungan saldo dan memakai referensi unik; permintaan withdrawal membuat reservasi saldo. Event callback terpisah untuk deduplikasi dan audit. Relasi ditahan (`restrictOnDelete`) agar histori keuangan tidak hilang. Tabel/event ini tidak berarti payout provider sedang aktif; konfigurasi payout diperiksa runtime.
+
+## 6. Bantuan digital, operasional, dan audit
 
 ```mermaid
 erDiagram
@@ -494,7 +552,7 @@ erDiagram
 
 `assisted_service_sessions.reference_type/reference_id` dan `notifications.reference_type/reference_id` adalah referensi polimorfik tanpa foreign key database. Aplikasi harus memvalidasi target record. Diagram tidak menggambarkan hubungan FK untuk pasangan kolom tersebut.
 
-## 6. Tabel infrastruktur Laravel
+## 7. Tabel infrastruktur Laravel
 
 Tabel berikut tidak memiliki hubungan bisnis FK pada migration saat ini:
 

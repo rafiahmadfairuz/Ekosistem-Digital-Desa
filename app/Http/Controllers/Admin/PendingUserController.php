@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AuditLogger;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -22,7 +24,7 @@ class PendingUserController extends Controller
         return view('admin.pending-users', ['pendingUsers' => $pendingUsers]);
     }
 
-    public function activate(User $user, AuditLogger $audit): RedirectResponse
+    public function activate(Request $request, User $user, AuditLogger $audit): RedirectResponse|JsonResponse
     {
         abort_if($user->email === null || ! $user->hasVerifiedEmail(), 422, 'Email harus diverifikasi sebelum aktivasi.');
         $wasActivated = DB::transaction(function () use ($user, $audit): bool {
@@ -39,17 +41,24 @@ class PendingUserController extends Controller
             return true;
         });
 
-        return redirect()->route('admin.users.index')->with(
-            'status',
-            $wasActivated ? 'Akun berhasil diaktifkan.' : 'Akun tersebut tidak lagi menunggu aktivasi.',
-        );
+        $message = $wasActivated ? 'Akun berhasil diaktifkan.' : 'Akun tersebut tidak lagi menunggu aktivasi.';
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message, 'activated' => $wasActivated]);
+        }
+
+        return redirect()->route('admin.users.index')->with('status', $message);
     }
 
-    public function resendVerification(User $user, AuditLogger $audit): RedirectResponse
+    public function resendVerification(Request $request, User $user, AuditLogger $audit): RedirectResponse|JsonResponse
     {
         abort_unless($user->account_status === 'pending', 404);
 
         if ($user->hasVerifiedEmail()) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Email akun tersebut sudah diverifikasi. Akun dapat diaktifkan sekarang.']);
+            }
+
             return back()->with('status', 'Email akun tersebut sudah diverifikasi. Akun dapat diaktifkan sekarang.');
         }
 
@@ -58,6 +67,12 @@ class PendingUserController extends Controller
         $user->sendEmailVerificationNotification();
         $audit->record('account.email_verification_resent', 'user', (int) $user->getKey());
 
-        return back()->with('status', 'Tautan verifikasi dikirim ulang untuk akun '.$user->username.'.');
+        $message = 'Tautan verifikasi dikirim ulang untuk akun '.$user->username.'.';
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return back()->with('status', $message);
     }
 }

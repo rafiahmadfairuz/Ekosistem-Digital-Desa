@@ -12,17 +12,17 @@
             @if ($currentVillageHead)
                 <p class="mt-2 text-sm leading-6"><span class="font-semibold">{{ $currentVillageHead->username }}</span> · {{ match($currentVillageHead->account_status) { 'active' => 'Aktif', 'suspended' => 'Ditangguhkan', 'disabled' => 'Dinonaktifkan', default => 'Status tidak diketahui' } }}</p>
             @else
-                <p class="mt-2 text-sm leading-6 text-muted">Belum ada akun yang memegang peran Village Head. Untuk penetapan pertama, pilih peran tersebut di halaman Akun dan peran.</p>
+                <p class="mt-2 text-sm leading-6 text-muted">Belum ada akun yang memegang peran Kepala Desa. Untuk penetapan pertama, pilih peran tersebut di halaman Akun dan peran.</p>
             @endif
         </section>
 
         @if ($currentVillageHead)
             <section class="mt-5 rounded-card border border-amber-700/40 bg-amber-50 p-5 sm:p-6" aria-labelledby="replacement-form-title">
                 <h2 id="replacement-form-title" class="text-lg font-semibold">Tetapkan pejabat pengganti</h2>
-                <p class="mt-2 text-sm leading-6">Peran Village Head akan dicabut dari akun saat ini dan diberikan kepada akun tujuan dalam satu transaksi. Peran lain pada kedua akun tidak berubah. Kata sandi Super Admin dan alasan pergantian diperlukan; keduanya dicatat sesuai kebijakan audit.</p>
+                <p class="mt-2 text-sm leading-6">Peran Kepala Desa akan dicabut dari akun saat ini dan diberikan kepada akun tujuan dalam satu transaksi. Peran lain pada kedua akun tidak berubah. Kata sandi Administrator Utama dan alasan pergantian diperlukan; keduanya dicatat sesuai kebijakan audit.</p>
 
                 @if ($villageHeadCandidates->isEmpty())
-                    <p class="mt-4 border-l-4 border-amber-800 bg-white/70 p-3 text-sm text-amber-950">Belum ada calon yang memenuhi syarat. Calon harus memiliki akun aktif dan email terverifikasi, serta tidak memegang peran Super Admin atau Village Head.</p>
+                    <p class="mt-4 border-l-4 border-amber-800 bg-white/70 p-3 text-sm text-amber-950">Belum ada calon yang memenuhi syarat. Calon harus memiliki akun aktif dan email terverifikasi, serta tidak memegang peran Administrator Utama atau Kepala Desa.</p>
                 @else
                     <form method="POST" action="{{ route('admin.users.village-head.replace') }}" class="mt-5 space-y-4" data-unsaved-form data-confirm="Alihkan peran Kepala Desa kepada akun yang dipilih? Tindakan ini akan dicatat di log audit.">
                         @csrf
@@ -35,7 +35,7 @@
                             @error('target_user_id')<p class="mt-1 text-sm text-red-800" role="alert">{{ $message }}</p>@enderror
                         </div>
                         <div>
-                            <label for="head-transfer-password" class="block text-sm font-semibold">Konfirmasi kata sandi Super Admin</label>
+                            <label for="head-transfer-password" class="block text-sm font-semibold">Konfirmasi kata sandi Administrator Utama</label>
                             <input id="head-transfer-password" type="password" name="current_password" required autocomplete="current-password" aria-invalid="{{ $errors->has('current_password') ? 'true' : 'false' }}" class="mt-2 min-h-11 w-full border border-slate-400 bg-white px-3 text-base text-ink focus-visible:outline-2 focus-visible:outline-offset-2">
                             @error('current_password')<p class="mt-1 text-sm text-red-800" role="alert">{{ $message }}</p>@enderror
                         </div>

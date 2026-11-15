@@ -477,7 +477,7 @@
                             @foreach ($roles as $role)
                                 <span class="db-hero-role-pill">
                                     <span class="db-hero-dot" aria-hidden="true"></span>
-                                    <span>{{ $role->name }}</span>
+                                    <span>{{ \App\Models\Role::displayName($role->name) }}</span>
                                 </span>
                             @endforeach
                         @else
@@ -503,7 +503,7 @@
 
                     @if ($adminSummary)
                         <p class="db-hero-note">
-                            Super Admin mengelola akses teknis dan tidak otomatis memiliki kewenangan hukum untuk menyetujui atau menandatangani dokumen desa.
+                            Administrator Utama mengelola akses teknis dan tidak otomatis memiliki kewenangan hukum untuk menyetujui atau menandatangani dokumen desa.
                         </p>
                     @endif
                 </aside>
@@ -557,7 +557,7 @@
                         <div>
                             <p class="db-authority-kicker">Status Kewenangan</p>
                             <p class="db-authority-role">
-                                {{ $roles->first()?->name ?? 'Pengguna Aktif' }}
+                                {{ $roles->first() ? \App\Models\Role::displayName($roles->first()->name) : 'Pengguna Aktif' }}
                             </p>
                         </div>
                         <p class="db-authority-foot">
@@ -683,7 +683,7 @@
                                 <x-ui.empty-state
                                     id="resident-profile-empty"
                                     title="Profil belum dilengkapi"
-                                    description="Isi profil agar wilayah tempat tinggal dapat diperiksa oleh Village Admin."
+                                    description="Isi profil agar wilayah tempat tinggal dapat diperiksa oleh Admin Desa."
                                     action="Lengkapi profil"
                                     :href="route('profile.create')"
                                     class="border-0 bg-transparent p-0"

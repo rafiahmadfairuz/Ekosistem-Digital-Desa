@@ -70,6 +70,7 @@ class NavigationMenu
                 ['label' => 'Verifikasi wilayah warga', 'route' => 'admin.resident-region-verification.index'],
                 ['label' => 'Pengaturan desa', 'route' => 'admin.village-settings.index'],
             ]);
+            $groups['Akun dan akses'][] = ['label' => 'Aktivasi akun', 'route' => 'admin.users.index'];
         }
 
         if (($hasRole('RT') || $hasRole('RW')) && $user->can('viewAny', Resident::class)) {

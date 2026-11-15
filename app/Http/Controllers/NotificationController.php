@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -9,6 +10,25 @@ use Illuminate\View\View;
 
 class NotificationController extends Controller
 {
+    public function markRead(Request $request, int $notification): JsonResponse
+    {
+        $record = DB::table('notifications')
+            ->where('id', $notification)
+            ->where('user_id', $request->user()->getKey())
+            ->first();
+        abort_unless($record !== null, 404);
+
+        DB::table('notifications')->where('id', $record->id)
+            ->where('user_id', $request->user()->getKey())
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return response()->json([
+            'message' => 'Pemberitahuan ditandai sudah dibaca.',
+            'unread_count' => DB::table('notifications')->where('user_id', $request->user()->getKey())->whereNull('read_at')->count(),
+        ]);
+    }
+
     public function index(Request $request): View
     {
         $notifications = DB::table('notifications')

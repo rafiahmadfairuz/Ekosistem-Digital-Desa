@@ -58,6 +58,7 @@ Route::middleware(['auth', 'account.active'])->group(function (): void {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{notification}/open', [NotificationController::class, 'open'])->whereNumber('notification')->name('notifications.open');
+    Route::post('/notifications/{notification}/mark-read', [NotificationController::class, 'markRead'])->whereNumber('notification')->name('notifications.mark-read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
 
     Route::prefix('marketplace')->name('marketplace.')->group(function (): void {
@@ -197,17 +198,20 @@ Route::middleware(['auth', 'account.active'])->group(function (): void {
         Route::delete('/villages/{village}', [RegionCatalogController::class, 'destroyVillage'])->name('villages.destroy');
     });
 
+    Route::middleware('role:Super Admin,Village Admin')->prefix('admin')->name('admin.')->group(function (): void {
+        Route::get('/users/pending', [PendingUserController::class, 'index'])->name('users.index');
+        Route::post('/users/{user}/activate', [PendingUserController::class, 'activate'])->name('users.activate');
+        Route::post('/users/{user}/resend-verification', [PendingUserController::class, 'resendVerification'])
+            ->middleware('throttle:verification-resend')
+            ->name('users.resend-verification');
+    });
+
     Route::middleware('role:Super Admin')->prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/regions', [RegionCatalogController::class, 'index'])->name('regions.index');
         Route::post('/villages', [RegionCatalogController::class, 'storeVillage'])->name('villages.store');
         Route::post('/regions/rw', [RegionCatalogController::class, 'storeRw'])->name('regions.rw.store');
         Route::post('/regions/rt', [RegionCatalogController::class, 'storeRt'])->name('regions.rt.store');
         Route::delete('/regions/{region}', [RegionCatalogController::class, 'destroyRegion'])->name('regions.destroy');
-        Route::get('/users/pending', [PendingUserController::class, 'index'])->name('users.index');
-        Route::post('/users/{user}/activate', [PendingUserController::class, 'activate'])->name('users.activate');
-        Route::post('/users/{user}/resend-verification', [PendingUserController::class, 'resendVerification'])
-            ->middleware('throttle:verification-resend')
-            ->name('users.resend-verification');
     });
 
     Route::middleware('role:Village Admin')->prefix('admin')->name('admin.')->group(function (): void {

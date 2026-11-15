@@ -401,7 +401,7 @@
             <div>
                 <p class="ur-kicker">
                     <span class="ur-kicker-dot" aria-hidden="true"></span>
-                    <span>Akses teknis · Super Admin</span>
+                    <span>Akses teknis · Administrator Utama</span>
                 </p>
 
                 <h1 class="ur-title">Akun dan peran</h1>
@@ -485,7 +485,7 @@
                                 <div class="ur-protected-box">
                                     <p class="ur-protected-title">Peran terlindungi</p>
                                     <p class="ur-protected-text">
-                                        {{ $user->roles->pluck('name')->intersect(['Super Admin', 'Village Head'])->implode(', ') }}
+                                        {{ $user->roles->whereIn('name', ['Super Admin', 'Village Head'])->map(fn ($role) => \App\Models\Role::displayName($role->name))->implode(', ') }}
                                         · perubahan peran dilakukan melalui proses pergantian khusus.
                                     </p>
                                 </div>
@@ -512,14 +512,14 @@
                                                         data-role-name="{{ $role->name }}"
                                                         @checked($user->roles->contains('id', $role->id))>
 
-                                                    <span class="break-words">{{ $role->name }}</span>
+                                                    <span class="break-words">{{ \App\Models\Role::displayName($role->name) }}</span>
                                                 </label>
                                             @endforeach
                                         </div>
                                     </fieldset>
 
                                     <p class="ur-helper">
-                                        Kombinasi multi-peran hanya diizinkan untuk RT + Resident atau RW + Resident. Village Head harus menjadi satu-satunya peran.
+                                        Kombinasi multi-peran hanya diizinkan untuk Ketua RT + Warga atau Ketua RW + Warga. Kepala Desa harus menjadi satu-satunya peran.
                                     </p>
 
                                     <button class="ur-btn-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">
@@ -583,7 +583,7 @@
                         @if((int) $user->id === (int) auth()->id())
                             <p class="ur-foot-note">Akun yang sedang digunakan tidak dapat dihapus.</p>
                         @elseif($user->roles->contains(fn ($role) => in_array($role->name, ['Super Admin', 'Village Head'], true)))
-                            <p class="ur-foot-note">Akun dengan peran Super Admin atau Village Head dilindungi dari penghapusan.</p>
+                            <p class="ur-foot-note">Akun dengan peran Administrator Utama atau Kepala Desa dilindungi dari penghapusan.</p>
                         @else
                             <span class="ur-foot-note">Tindakan penghapusan akun bersifat permanen.</span>
 

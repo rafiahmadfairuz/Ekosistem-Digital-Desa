@@ -319,10 +319,10 @@
             <div>
                 <p class="act-kicker">
                     <span class="act-kicker-dot" aria-hidden="true"></span>
-                    <span>Akses terbatas · Super Admin</span>
+                    <span>Akses khusus · Administrator Utama dan Admin Desa</span>
                 </p>
-                <h1 class="act-title">Aktivasi akun warga</h1>
-                <p class="act-desc">Periksa permintaan yang menunggu, lalu aktifkan akun sesuai prosedur desa. Aktivasi tidak memberikan peran administratif.</p>
+                <h1 class="act-title">Aktivasi akun</h1>
+                <p class="act-desc">Periksa akun yang menunggu, lalu aktifkan setelah alamat email diverifikasi. Aktivasi tidak memberikan peran administratif.</p>
 
                 @if (config('mail.default') === 'log')
                     <div class="act-notice">
@@ -337,7 +337,7 @@
             <section class="act-card act-empty" aria-labelledby="empty-title">
                 <div class="act-empty-pill" aria-hidden="true">✓</div>
                 <h2 id="empty-title" class="act-empty-title">Tidak ada akun menunggu</h2>
-                <p class="act-empty-desc">Akun warga baru yang menunggu aktivasi akan muncul di halaman ini.</p>
+                <p class="act-empty-desc">Akun baru yang menunggu aktivasi akan muncul di halaman ini.</p>
             </section>
         @else
             <div class="act-card">

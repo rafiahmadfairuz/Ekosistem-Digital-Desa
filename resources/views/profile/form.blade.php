@@ -15,7 +15,7 @@
     @elseif(($resident->region_verified_at ?? null) === null)
         <div class="border-l-4 border-amber-700 bg-amber-50 p-4 text-sm leading-6 text-amber-950" role="status">
             <p class="font-semibold">Wilayah RT belum disiapkan</p>
-            <p class="mt-1">Profil belum dapat disimpan karena belum ada pilihan Wilayah yang valid. Minta Super Admin menambahkan data desa, RW, dan RT, lalu muat ulang halaman ini.</p>
+            <p class="mt-1">Profil belum dapat disimpan karena belum ada pilihan wilayah yang valid. Minta Administrator Utama menambahkan data desa, RW, dan RT, lalu muat ulang halaman ini.</p>
             @error('region_id')<p class="mt-2 font-medium">{{ $message }}</p>@enderror
         </div>
     @endif

@@ -2,10 +2,19 @@
 @php
     $user = auth()->user();
     $navigationGroups = $user ? app(\App\Services\NavigationMenu::class)->for($user) : [];
-    $accountRoles = $user?->roles->pluck('name') ?? collect();
+    $accountRoles = $user?->roles->map(fn ($role) => \App\Models\Role::displayName($role->name)) ?? collect();
+    $recentNotifications = $user
+        ? \Illuminate\Support\Facades\DB::table('notifications')->where('user_id', $user->getKey())->orderByDesc('created_at')->orderByDesc('id')->limit(8)->get()
+        : collect();
     $unreadNotificationCount = $user
         ? \Illuminate\Support\Facades\DB::table('notifications')->where('user_id', $user->getKey())->whereNull('read_at')->count()
         : 0;
+    $canReviewPendingAccounts = $user && ($user->hasRole('Super Admin') || $user->hasRole('Village Admin'));
+    $pendingActivationUsers = $canReviewPendingAccounts
+        ? \App\Models\User::query()->where('account_status', 'pending')->orderBy('created_at')->limit(8)->get(['id', 'username', 'email', 'email_verified_at'])
+        : collect();
+    $pendingActivationCount = $canReviewPendingAccounts ? \App\Models\User::query()->where('account_status', 'pending')->count() : 0;
+    $notificationBadgeCount = $unreadNotificationCount + $pendingActivationCount;
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -196,6 +205,21 @@
             justify-content: center;
             box-shadow: 0 0 0 2px #ffffff;
         }
+        #notifications-panel {
+            position: fixed;
+            inset: 0 0 0 auto;
+            width: min(30rem, 100vw);
+            max-width: 100vw;
+            height: 100dvh;
+            max-height: none;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            color: #0f172a;
+            background: #f8faf9;
+            box-shadow: -16px 0 40px -18px rgba(15, 23, 42, .35);
+        }
+        #notifications-panel::backdrop { background: rgba(15, 23, 42, .35); }
         .header-vertical-divider {
             width: 1px;
             height: 1.875rem;
@@ -317,15 +341,15 @@
                     <span class="header-page-title max-w-28 truncate text-right text-sm sm:hidden">{{ $title }}</span>
 
                     @if($user)
-                    <a href="{{ route('notifications.index') }}" class="header-notif-btn focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600" aria-label="Pemberitahuan{{ $unreadNotificationCount > 0 ? ', '.$unreadNotificationCount.' belum dibaca' : '' }}">
+                    <button type="button" data-notifications-open aria-controls="notifications-panel" aria-haspopup="dialog" class="header-notif-btn focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600" aria-label="Buka pemberitahuan{{ $notificationBadgeCount > 0 ? ', '.$notificationBadgeCount.' perlu ditinjau' : '' }}">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
                             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                         </svg>
-                        @if ($unreadNotificationCount > 0)
-                            <span class="header-notif-badge" aria-hidden="true">{{ $unreadNotificationCount > 99 ? '99+' : $unreadNotificationCount }}</span>
+                        @if ($notificationBadgeCount > 0)
+                            <span data-notification-badge class="header-notif-badge" aria-hidden="true">{{ $notificationBadgeCount > 99 ? '99+' : $notificationBadgeCount }}</span>
                         @endif
-                    </a>
+                    </button>
 
                     <span class="header-vertical-divider" aria-hidden="true"></span>
 
@@ -344,6 +368,84 @@
                     @endif
                 </div>
             </header>
+
+            @if($user)
+                <dialog id="notifications-panel" aria-labelledby="notifications-panel-title" class="overflow-hidden">
+                    <div class="flex h-full flex-col">
+                        <header class="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-5 sm:px-6">
+                            <div>
+                                <h2 id="notifications-panel-title" class="text-xl font-bold text-slate-900">Pemberitahuan</h2>
+                                <p class="mt-1 text-sm text-slate-600">Pembaruan terbaru untuk akun Anda.</p>
+                                <p data-notification-status role="status" aria-live="polite" class="mt-2 text-sm font-medium text-emerald-800"></p>
+                            </div>
+                            <button type="button" data-notifications-close class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl text-2xl text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600" aria-label="Tutup pemberitahuan">×</button>
+                        </header>
+                        <div class="min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
+                            @if($canReviewPendingAccounts)
+                                <section aria-labelledby="pending-accounts-title">
+                                    <div class="mb-3 flex items-center justify-between gap-3">
+                                        <h3 id="pending-accounts-title" class="font-semibold text-slate-900">Aktivasi akun</h3>
+                                        <span data-pending-account-count="{{ $pendingActivationCount }}" class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">{{ $pendingActivationCount }} menunggu</span>
+                                    </div>
+                                    <div data-pending-account-list class="space-y-3">
+                                        @forelse($pendingActivationUsers as $pendingUser)
+                                            <article data-pending-account-row class="rounded-xl border border-slate-200 bg-white p-4">
+                                                <p class="break-words font-semibold text-slate-900">{{ $pendingUser->username }}</p>
+                                                <p class="mt-1 break-all text-sm text-slate-600">{{ $pendingUser->email ?: 'Email belum tersedia' }}</p>
+                                                @if($pendingUser->hasVerifiedEmail())
+                                                    <form method="POST" action="{{ route('admin.users.activate', $pendingUser) }}" data-async-notification-form data-action-kind="activate" class="mt-3">
+                                                        @csrf
+                                                        <input type="hidden" name="action_kind" value="activate">
+                                                        <button class="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">Aktifkan akun</button>
+                                                    </form>
+                                                @elseif($pendingUser->email)
+                                                    <div class="mt-3 flex flex-wrap items-center gap-3">
+                                                        <span class="text-sm text-amber-800">Menunggu verifikasi email</span>
+                                                        <form method="POST" action="{{ route('admin.users.resend-verification', $pendingUser) }}" data-async-notification-form data-action-kind="resend">
+                                                            @csrf
+                                                            <input type="hidden" name="action_kind" value="resend">
+                                                            <button class="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">Kirim ulang tautan</button>
+                                                        </form>
+                                                    </div>
+                                                @endif
+                                                <p data-notification-action-feedback class="mt-2 text-sm text-emerald-800" aria-live="polite"></p>
+                                            </article>
+                                        @empty
+                                            <p data-pending-empty class="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">Tidak ada akun yang menunggu aktivasi.</p>
+                                        @endforelse
+                                    </div>
+                                </section>
+                            @endif
+
+                            <section aria-labelledby="recent-notifications-title">
+                                <h3 id="recent-notifications-title" class="mb-3 font-semibold text-slate-900">Pembaruan terbaru</h3>
+                                <div data-notification-list class="space-y-3">
+                                    @forelse($recentNotifications as $notification)
+                                        <article data-notification-row data-read="{{ $notification->read_at ? 'true' : 'false' }}" class="rounded-xl border border-slate-200 bg-white p-4 {{ $notification->read_at ? '' : 'ring-1 ring-emerald-100' }}">
+                                            <div class="flex items-start justify-between gap-3">
+                                                <h4 class="break-words font-semibold text-slate-900">{{ $notification->title }}</h4>
+                                                <span data-notification-read-label class="shrink-0 text-xs font-medium text-slate-500">{{ $notification->read_at ? 'Sudah dibaca' : 'Belum dibaca' }}</span>
+                                            </div>
+                                            <p class="mt-2 break-words text-sm leading-6 text-slate-600">{{ $notification->message }}</p>
+                                            <time class="mt-2 block text-xs text-slate-500" datetime="{{ $notification->created_at }}">{{ \Illuminate\Support\Carbon::parse($notification->created_at)->timezone('Asia/Jakarta')->format('d M Y, H:i') }}</time>
+                                            @if(!$notification->read_at)
+                                                <form method="POST" action="{{ route('notifications.mark-read', $notification->id) }}" data-async-notification-form data-action-kind="read" class="mt-3">
+                                                    @csrf
+                                                    <input type="hidden" name="action_kind" value="read">
+                                                    <button class="inline-flex min-h-11 items-center text-sm font-semibold text-emerald-800 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">Tandai sudah dibaca</button>
+                                                </form>
+                                            @endif
+                                            <p data-notification-action-feedback role="status" aria-live="polite" class="mt-2 text-sm text-rose-800"></p>
+                                        </article>
+                                    @empty
+                                        <p data-notification-empty class="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">Belum ada pemberitahuan.</p>
+                                    @endforelse
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </dialog>
+            @endif
 
             <div class="app-content-surface min-h-[calc(100dvh-4rem)]">
                 @if (session('status'))
@@ -423,6 +525,109 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const notificationDialog = document.getElementById('notifications-panel');
+            const notificationOpenButton = document.querySelector('[data-notifications-open]');
+            let notificationBadge = document.querySelector('[data-notification-badge]');
+            const pendingCountElement = document.querySelector('[data-pending-account-count]');
+            const notificationStatus = document.querySelector('[data-notification-status]');
+            let unreadNotificationCount = Number({{ $unreadNotificationCount }});
+
+            if (notificationDialog && notificationOpenButton) {
+                notificationOpenButton.addEventListener('click', function () {
+                    notificationDialog.showModal();
+                });
+
+                document.querySelectorAll('[data-notifications-close]').forEach(function (button) {
+                    button.addEventListener('click', function () {
+                        notificationDialog.close();
+                    });
+                });
+
+                notificationDialog.addEventListener('click', function (event) {
+                    if (event.target === notificationDialog) {
+                        notificationDialog.close();
+                    }
+                });
+
+                const updateBadge = function (unreadCount) {
+                    const pendingCount = pendingCountElement ? Number(pendingCountElement.dataset.pendingAccountCount || 0) : 0;
+                    const total = unreadCount + pendingCount;
+                    if (total < 1) {
+                        if (notificationBadge) notificationBadge.remove();
+                        notificationOpenButton.setAttribute('aria-label', 'Buka pemberitahuan');
+                        return;
+                    }
+                    const badge = notificationBadge || document.createElement('span');
+                    notificationBadge = badge;
+                    badge.dataset.notificationBadge = '';
+                    badge.className = 'header-notif-badge';
+                    badge.setAttribute('aria-hidden', 'true');
+                    badge.textContent = total > 99 ? '99+' : String(total);
+                    if (!badge.isConnected) notificationOpenButton.append(badge);
+                    notificationOpenButton.setAttribute('aria-label', 'Buka pemberitahuan, ' + total + ' perlu ditinjau');
+                };
+
+                document.querySelectorAll('[data-async-notification-form]').forEach(function (form) {
+                    form.addEventListener('submit', async function (event) {
+                        event.preventDefault();
+                        const button = form.querySelector('button[type="submit"], button:not([type])');
+                        const feedback = form.closest('article')?.querySelector('[data-notification-action-feedback]');
+                        if (button) {
+                            button.disabled = true;
+                            button.setAttribute('aria-busy', 'true');
+                            button.insertAdjacentHTML('afterbegin', '<span class="mr-2 inline-block motion-safe:animate-spin" aria-hidden="true">⟳</span>');
+                        }
+                        try {
+                            const response = await fetch(form.action, {
+                                method: 'POST',
+                                body: new FormData(form),
+                                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                                credentials: 'same-origin'
+                            });
+                            const result = await response.json();
+                            if (!response.ok) throw new Error(result.message || 'Tindakan gagal diproses.');
+
+                            if (form.dataset.actionKind === 'read') {
+                                const row = form.closest('[data-notification-row]');
+                                row.dataset.read = 'true';
+                                row.classList.remove('ring-1', 'ring-emerald-100');
+                                row.querySelector('[data-notification-read-label]').textContent = 'Sudah dibaca';
+                                form.remove();
+                                unreadNotificationCount = Number(result.unread_count || 0);
+                                updateBadge(unreadNotificationCount);
+                                if (notificationStatus) notificationStatus.textContent = result.message;
+                            } else if (form.dataset.actionKind === 'activate') {
+                                const row = form.closest('[data-pending-account-row]');
+                                row.remove();
+                                const nextCount = Math.max(0, Number(pendingCountElement.dataset.pendingAccountCount || 0) - 1);
+                                pendingCountElement.dataset.pendingAccountCount = String(nextCount);
+                                pendingCountElement.textContent = nextCount + ' menunggu';
+                                if (nextCount === 0) {
+                                    document.querySelector('[data-pending-account-list]').innerHTML = '<p class="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">Tidak ada akun yang menunggu aktivasi.</p>';
+                                }
+                                updateBadge(unreadNotificationCount);
+                                if (notificationStatus) notificationStatus.textContent = result.message;
+                            } else if (feedback) {
+                                feedback.textContent = result.message;
+                                feedback.classList.remove('text-rose-800');
+                                feedback.classList.add('text-emerald-800');
+                                if (notificationStatus) notificationStatus.textContent = result.message;
+                                form.remove();
+                            }
+                        } catch (error) {
+                            const message = error.message || 'Tidak dapat menghubungi server. Coba lagi.';
+                            if (feedback) feedback.textContent = message;
+                            if (notificationStatus) notificationStatus.textContent = message;
+                            if (button) {
+                                button.disabled = false;
+                                button.removeAttribute('aria-busy');
+                                button.querySelector('span[aria-hidden="true"]')?.remove();
+                            }
+                        }
+                    });
+                });
+            }
+
             const mobileDialog = document.getElementById('mobile-navigation');
             const mobileOpenBtns = document.querySelectorAll('[data-mobile-menu-open]');
             const mobileCloseBtns = document.querySelectorAll('[data-mobile-menu-close]');

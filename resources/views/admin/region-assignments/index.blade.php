@@ -4,7 +4,7 @@
         <header class="max-w-3xl">
             <p class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-600">
                 <span class="size-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
-                <span>Akses teknis · Super Admin</span>
+                <span>Akses teknis · Administrator Utama</span>
             </p>
 
             <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-800 sm:text-[1.625rem]">
@@ -43,7 +43,7 @@
                             <option
                                 value="{{ $user->id }}"
                                 data-role-set="{{ $user->roles->pluck('name')->intersect(['RT','RW','Resident'])->sort()->implode('|') }}">
-                                {{ $user->username }} · {{ $user->roles->pluck('name')->intersect(['RT','RW','Resident'])->implode(', ') }}
+                                {{ $user->username }} · {{ $user->roles->whereIn('name', ['RT','RW','Resident'])->map(fn ($role) => \App\Models\Role::displayName($role->name))->implode(', ') }}
                             </option>
                         @endforeach
                     </select>
