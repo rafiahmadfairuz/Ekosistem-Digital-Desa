@@ -231,7 +231,10 @@ class AuthorizationTest extends TestCase
         $one->save();
 
         $this->actingAs($ownerOne)->get(route('profile.show'))
-            ->assertOk()->assertDontSee('NIK')->assertSee('Alamat rahasia')->assertSee('+628123456789');
+            ->assertOk()->assertDontSee('NIK')->assertSee('Alamat rahasia')->assertSee('+628123456789')
+            ->assertSee('Wilayah terverifikasi')->assertDontSee('@else');
+        $this->actingAs($ownerUnverified)->get(route('profile.show'))
+            ->assertOk()->assertSee('Menunggu verifikasi wilayah')->assertDontSee('@else');
         $this->actingAs($ownerOne)->get(route('profile.edit'))->assertOk()->assertDontSee('national_id')->assertDontSee('NIK');
 
         $this->actingAs($officer)->get(route('officer.residents.index'))
