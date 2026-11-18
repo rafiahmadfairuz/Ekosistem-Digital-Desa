@@ -172,8 +172,8 @@
         }
         .header-notif-btn {
             position: relative;
-            width: 2.625rem;
-            height: 2.625rem;
+            width: 2.5rem;
+            height: 2.5rem;
             border-radius: 0.75rem;
             color: #64748b;
             background-color: #ffffff;
@@ -182,6 +182,12 @@
             justify-content: center;
             flex-shrink: 0;
             transition: background-color 0.16s ease, color 0.16s ease;
+        }
+        @media (min-width: 640px) {
+            .header-notif-btn {
+                width: 2.625rem;
+                height: 2.625rem;
+            }
         }
         .header-notif-btn:hover {
             background-color: #ecfdf5;
@@ -222,13 +228,13 @@
         #notifications-panel::backdrop { background: rgba(15, 23, 42, .35); }
         .header-vertical-divider {
             width: 1px;
-            height: 1.875rem;
+            height: 1.75rem;
             background-color: #cbd5e1;
             flex-shrink: 0;
         }
         .header-profile-avatar {
-            width: 2.375rem;
-            height: 2.375rem;
+            width: 2.25rem;
+            height: 2.25rem;
             border-radius: 9999px;
             background-color: #065f46;
             color: #ffffff;
@@ -240,12 +246,32 @@
             justify-content: center;
             flex-shrink: 0;
         }
+        @media (min-width: 640px) {
+            .header-profile-avatar {
+                width: 2.375rem;
+                height: 2.375rem;
+            }
+        }
+        @keyframes profileDropdownIn {
+            from {
+                opacity: 0;
+                transform: translateY(-6px) scale(0.97);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .profile-dropdown-animate {
+            animation: profileDropdownIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
     </style>
 </head>
 <body class="min-h-dvh bg-white text-slate-700 antialiased">
     <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-white focus:px-4 focus:py-3 focus:text-slate-800 focus:shadow-lg focus:ring-2 focus:ring-emerald-600">Lewati ke konten</a>
 
     <div class="min-h-dvh lg:flex">
+        {{-- Desktop Sidebar --}}
         <aside id="app-sidebar" data-collapsed="false" class="relative z-30 hidden shrink-0 flex-col bg-white px-4 pb-5 lg:sticky lg:top-0 lg:flex lg:h-dvh" aria-label="Bilah sisi aplikasi">
             <div class="sidebar-topbar shrink-0">
                 <button type="button" id="sidebar-collapse-btn" aria-expanded="true" aria-controls="app-sidebar" aria-label="Ciutkan atau luaskan bilah sisi" data-sidebar-tooltip="Luaskan menu" class="sidebar-toggle-btn focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">
@@ -255,11 +281,11 @@
                 </button>
 
                 <a href="{{ $user ? route('dashboard') : route('home') }}" class="sidebar-text min-w-0 flex-1 truncate text-xl font-bold tracking-tight text-slate-800 transition hover:text-emerald-700 focus-visible:outline-offset-2 focus-visible:outline-emerald-600" translate="no">
-                      <img
-                            src="{{ asset('images/logo.png') }}"
-                            alt="{{ config('app.name') }}"
-                            class="h-6 w-auto max-w-32 object-contain sm:h-8"
-                        >
+                    <img
+                        src="{{ asset('images/logo.png') }}"
+                        alt="{{ config('app.name') }}"
+                        class="h-7 w-auto max-w-36 object-contain"
+                    >
                 </a>
             </div>
 
@@ -275,7 +301,7 @@
                         </div>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-                            <button type="submit" data-sidebar-tooltip="Keluar" class="sidebar-logout-btn group flex min-h-11 w-full items-center gap-3.5 rounded-xl px-3.5 text-left text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">
+                            <button type="submit" data-sidebar-tooltip="Keluar" class="sidebar-logout-btn group flex min-h-11 w-full cursor-pointer items-center gap-3.5 rounded-xl px-3.5 text-left text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">
                                 <svg class="size-5 shrink-0 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                                     <polyline points="16 17 21 12 16 7" />
@@ -316,31 +342,31 @@
             @endif
         </aside>
 
+        {{-- Area Konten Utama --}}
         <div class="app-content-surface min-w-0 flex-1">
-            <header id="app-top-header" class="sticky top-0 z-20 flex items-center justify-between gap-3 bg-white px-4 sm:px-8">
-                <div class="flex min-w-0 items-center gap-3">
-                    @if($user)
-                    <button type="button" data-mobile-menu-open aria-controls="mobile-navigation" aria-haspopup="dialog" class="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-900 transition hover:border-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 lg:hidden" aria-label="Buka menu navigasi">
+            <header id="app-top-header" class="sticky top-0 z-20 flex items-center justify-between gap-2 bg-white px-3.5 sm:gap-4 sm:px-6 lg:px-8">
+                {{-- Kiri Header: Tombol Menu Mobile & Judul Halaman --}}
+                <div class="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+                    <button
+                        type="button"
+                        data-mobile-menu-open
+                        aria-controls="mobile-navigation"
+                        aria-haspopup="dialog"
+                        class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-800 transition hover:border-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 lg:hidden"
+                        aria-label="Buka menu navigasi"
+                    >
                         <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
                     </button>
-                    @endif
 
-                    <a href="{{ $user ? route('dashboard') : route('home') }}" class="flex min-h-11 min-w-0 items-center transition focus-visible:outline-offset-2 focus-visible:outline-emerald-600 lg:hidden" aria-label="{{ config('app.name') }}{{ $user ? ', ringkasan' : '' }}" translate="no">
-                        {{-- <img
-                            src="{{ asset('images/logo.png') }}"
-                            alt="{{ config('app.name') }}"
-                            class="h-7 w-auto max-w-32 object-contain sm:h-8"
-                        > --}}
-                    </a>
-
-                    <span class="hidden h-5 w-px bg-slate-300 sm:inline-block lg:hidden" aria-hidden="true"></span>
-                    <span class="header-page-title hidden min-w-0 truncate text-base tracking-tight sm:inline-block sm:text-lg">{{ $title }}</span>
+                    <span class="header-page-title min-w-0 truncate text-sm tracking-tight sm:text-base lg:text-lg">
+                        {{ $title }}
+                    </span>
                 </div>
 
-                <div class="flex shrink-0 items-center gap-3.5">
-                    <span class="header-page-title max-w-28 truncate text-right text-sm sm:hidden">{{ $title }}</span>
-
+                {{-- Kanan Header: Notifikasi & Profil Dropdown --}}
+                <div class="flex shrink-0 items-center gap-2 sm:gap-3.5">
                     @if($user)
+
                     <button type="button" data-notifications-open aria-controls="notifications-panel" aria-haspopup="dialog" class="header-notif-btn focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600" aria-label="Buka pemberitahuan{{ $notificationBadgeCount > 0 ? ', '.$notificationBadgeCount.' perlu ditinjau' : '' }}">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
@@ -351,20 +377,124 @@
                         @endif
                     </button>
 
-                    <span class="header-vertical-divider" aria-hidden="true"></span>
 
-                    <div class="flex items-center gap-3">
-                        <span class="header-profile-avatar" aria-hidden="true">
-                            {{ mb_substr($user->username, 0, 1) }}
-                        </span>
-                        <div class="min-w-0 text-left">
-                            <p class="max-w-36 truncate text-sm font-bold leading-tight text-slate-800 sm:max-w-48">{{ $user->username }}</p>
-                            <p class="mt-0.5 max-w-36 truncate text-xs font-medium leading-tight text-slate-500 sm:max-w-48">{{ $accountRoles->isNotEmpty() ? $accountRoles->join(' · ') : 'Pengguna' }}</p>
+                        <span class="header-vertical-divider" aria-hidden="true"></span>
+
+                        {{-- Wrapper Dropdown Profil --}}
+                        <div class="relative" id="header-profile-wrapper">
+                            <button
+                                type="button"
+                                id="header-profile-trigger"
+                                aria-expanded="false"
+                                aria-haspopup="true"
+                                aria-controls="header-profile-menu"
+                                class="group flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-transparent p-1 text-left transition hover:border-slate-200 hover:bg-slate-50/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 sm:gap-2.5 sm:px-2"
+                            >
+                                <span class="header-profile-avatar shadow-2xs transition-transform group-hover:scale-103" aria-hidden="true">
+                                    {{ mb_substr($user->username, 0, 1) }}
+                                </span>
+
+                                <div class="hidden min-w-0 text-left sm:block">
+                                    <p class="max-w-36 truncate text-sm font-bold leading-tight text-slate-800 md:max-w-44">
+                                        {{ $user->username }}
+                                    </p>
+                                    <p class="mt-0.5 max-w-36 truncate text-xs font-medium leading-tight text-slate-500 md:max-w-44">
+                                        {{ $accountRoles->isNotEmpty() ? $accountRoles->join(' · ') : 'Pengguna' }}
+                                    </p>
+                                </div>
+
+                                <svg
+                                    id="header-profile-chevron"
+                                    class="size-4 shrink-0 text-slate-400 transition-transform duration-200 group-hover:text-slate-600"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    aria-hidden="true"
+                                >
+                                    <path d="m6 9 6 6 6-6" />
+                                </svg>
+                            </button>
+
+                            {{-- Popup Menu Profil & Logout --}}
+                            <div
+                                id="header-profile-menu"
+                                role="menu"
+                                aria-labelledby="header-profile-trigger"
+                                class="profile-dropdown-animate absolute right-0 z-50 mt-2 hidden w-64 origin-top-right overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/5"
+                            >
+                                {{-- Info Akun di Dalam Popup (Sangat berguna di Mobile) --}}
+                                <div class="border-b border-slate-100 bg-slate-50/70 px-4 py-3.5">
+                                    <div class="flex items-center gap-3">
+                                        <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-800 text-xs font-bold uppercase text-white" aria-hidden="true">
+                                            {{ mb_substr($user->username, 0, 1) }}
+                                        </span>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-bold text-slate-900">{{ $user->username }}</p>
+                                            <p class="mt-0.5 truncate text-xs font-medium text-emerald-700">
+                                                {{ $accountRoles->isNotEmpty() ? $accountRoles->join(' · ') : 'Pengguna' }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Navigasi Cepat Akun --}}
+                                <div class="p-1.5">
+                                    <a
+                                        href="{{ route('dashboard') }}"
+                                        role="menuitem"
+                                        class="flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-emerald-50/70 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-600"
+                                    >
+                                        <svg class="size-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                                            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                                            <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                                            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                                        </svg>
+                                        <span>Ringkasan akses</span>
+                                    </a>
+
+                                    @if (\Illuminate\Support\Facades\Route::has('profile.show') && $user->hasRole('Resident'))
+                                        <a
+                                            href="{{ route('profile.show') }}"
+                                            role="menuitem"
+                                            class="flex min-h-10 items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-emerald-50/70 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-600"
+                                        >
+                                            <svg class="size-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <circle cx="12" cy="10" r="3" />
+                                                <path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" />
+                                            </svg>
+                                            <span>Profil saya</span>
+                                        </a>
+                                    @endif
+                                </div>
+
+                                {{-- Tombol Keluar (Logout) --}}
+                                <div class="border-t border-slate-100 p-1.5">
+                                    <form method="POST" action="{{ route('logout') }}">
+                                        @csrf
+                                        <button
+                                            type="submit"
+                                            role="menuitem"
+                                            class="flex min-h-10 w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-semibold text-rose-600 transition hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-rose-600"
+                                        >
+                                            <svg class="size-4 shrink-0 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                                <polyline points="16 17 21 12 16 7" />
+                                                <line x1="21" y1="12" x2="9" y2="12" />
+                                            </svg>
+                                            <span>Keluar dari akun</span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
                         </div>
-                    </div>
                     @else
-                        <a href="{{ route('login') }}" class="inline-flex min-h-10 shrink-0 items-center rounded-xl border border-slate-300 bg-white px-3.5 text-sm font-semibold text-slate-600 transition hover:border-emerald-600 hover:bg-emerald-50 hover:text-emerald-700">Masuk</a>
-                        <a href="{{ route('register') }}" class="hidden min-h-10 shrink-0 items-center rounded-xl bg-emerald-600 px-3.5 text-sm font-semibold text-white transition hover:bg-emerald-700 sm:inline-flex">Daftar</a>
+                        <a href="{{ route('login') }}" class="inline-flex min-h-10 shrink-0 items-center rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:border-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 sm:px-3.5 sm:text-sm">Masuk</a>
+                        <a href="{{ route('register') }}" class="inline-flex min-h-10 shrink-0 items-center rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 sm:px-3.5 sm:text-sm">Daftar</a>
                     @endif
                 </div>
             </header>
@@ -490,41 +620,76 @@
         </div>
     </aside>
 
-    @if($user)
-    <dialog id="mobile-navigation" aria-labelledby="mobile-navigation-title" class="m-0 h-dvh w-full max-h-none max-w-none border-0 bg-white p-0 text-slate-950 backdrop:bg-slate-900/30">
+    {{-- Mobile Navigation Drawer (Untuk Pengguna Login maupun Tamu) --}}
+    <dialog id="mobile-navigation" aria-labelledby="mobile-navigation-title" class="m-0 h-dvh w-full max-h-none max-w-sm border-0 bg-white p-0 text-slate-950 shadow-2xl backdrop:bg-slate-900/40 backdrop:backdrop-blur-2xs">
         <div class="flex h-full flex-col overflow-y-auto px-5 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
-            <div class="flex min-h-16 items-center justify-between gap-3 border-b border-slate-300 shadow-xs">
-                <a href="{{ route('dashboard') }}" id="mobile-navigation-title" class="flex items-center" aria-label="{{ config('app.name') }}" translate="no">
+            <div class="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200">
+                <a href="{{ $user ? route('dashboard') : route('home') }}" id="mobile-navigation-title" class="flex items-center" aria-label="{{ config('app.name') }}" translate="no">
                     <img
                         src="{{ asset('images/logo.png') }}"
                         alt="{{ config('app.name') }}"
-                        class="h-8 w-auto object-contain"
+                        class="h-7 w-auto object-contain sm:h-8"
                     >
                 </a>
-                <button type="button" data-mobile-menu-close class="inline-flex size-11 items-center justify-center rounded-xl border border-slate-300 text-slate-800 transition hover:border-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-offset-2 focus-visible:outline-emerald-600" aria-label="Tutup menu navigasi">
-                    <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                <button type="button" data-mobile-menu-close class="inline-flex size-10 cursor-pointer items-center justify-center rounded-xl border border-slate-300 text-slate-700 transition hover:border-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-offset-2 focus-visible:outline-emerald-600" aria-label="Tutup menu navigasi">
+                    <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
                 </button>
             </div>
-            <div class="min-h-0 flex-1 overflow-y-auto py-4">
-                <div class="divide-y divide-slate-300">
-                    <x-navigation.items :groups="$navigationGroups" />
-                </div>
-                <div class="mt-4 border-t border-slate-300 pt-4">
-                    <div class="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        LAINNYA
+
+            @if($user)
+                <div class="min-h-0 flex-1 overflow-y-auto py-4">
+                    <div class="space-y-4">
+                        <x-navigation.items :groups="$navigationGroups" />
                     </div>
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <x-ui.button type="submit" variant="plain" class="w-full justify-start rounded-xl px-3 py-2.5 text-sm font-medium text-slate-900 hover:bg-emerald-50 hover:text-emerald-700">Keluar</x-ui.button>
-                    </form>
+                    <div class="mt-5 border-t border-slate-200 pt-4">
+                        <div class="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                            LAINNYA
+                        </div>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="flex min-h-11 w-full cursor-pointer items-center gap-3.5 rounded-xl px-3.5 text-left text-sm font-semibold text-rose-600 transition hover:bg-rose-50">
+                                <svg class="size-5 shrink-0 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                    <polyline points="16 17 21 12 16 7" />
+                                    <line x1="21" y1="12" x2="9" y2="12" />
+                                </svg>
+                                <span>Keluar</span>
+                            </button>
+                        </form>
+                    </div>
                 </div>
-            </div>
+            @else
+                <div class="min-h-0 flex-1 overflow-y-auto py-4">
+                    <div class="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        UTAMA
+                    </div>
+                    <nav aria-label="Navigasi pasar desa">
+                        <a href="{{ route('marketplace.index') }}" class="flex min-h-11 items-center gap-3.5 rounded-xl bg-emerald-600 px-3.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                            <svg class="size-5 shrink-0 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                                <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                                <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                            </svg>
+                            <span>Pasar desa</span>
+                        </a>
+                    </nav>
+                    <div class="mt-5 flex flex-col gap-2.5 border-t border-slate-200 pt-4">
+                        <a href="{{ route('login') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-emerald-600 hover:bg-emerald-50 hover:text-emerald-700">
+                            Masuk
+                        </a>
+                        <a href="{{ route('register') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                            Daftar
+                        </a>
+                    </div>
+                </div>
+            @endif
         </div>
     </dialog>
-    @endif
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+
             const notificationDialog = document.getElementById('notifications-panel');
             const notificationOpenButton = document.querySelector('[data-notifications-open]');
             let notificationBadge = document.querySelector('[data-notification-badge]');
@@ -628,6 +793,51 @@
                 });
             }
 
+
+
+            /* 1. Dropdown Profil & Logout */
+            const profileWrapper = document.getElementById('header-profile-wrapper');
+            const profileTrigger = document.getElementById('header-profile-trigger');
+            const profileMenu = document.getElementById('header-profile-menu');
+            const profileChevron = document.getElementById('header-profile-chevron');
+
+            if (profileWrapper && profileTrigger && profileMenu) {
+                const toggleProfileMenu = function (forceState) {
+                    const isCurrentlyOpen = !profileMenu.classList.contains('hidden');
+                    const nextState = typeof forceState === 'boolean' ? forceState : !isCurrentlyOpen;
+
+                    if (nextState) {
+                        profileMenu.classList.remove('hidden');
+                        profileTrigger.setAttribute('aria-expanded', 'true');
+                        if (profileChevron) profileChevron.classList.add('rotate-180');
+                    } else {
+                        profileMenu.classList.add('hidden');
+                        profileTrigger.setAttribute('aria-expanded', 'false');
+                        if (profileChevron) profileChevron.classList.remove('rotate-180');
+                    }
+                };
+
+                profileTrigger.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    toggleProfileMenu();
+                });
+
+                document.addEventListener('click', function (e) {
+                    if (!profileWrapper.contains(e.target)) {
+                        toggleProfileMenu(false);
+                    }
+                });
+
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape' && !profileMenu.classList.contains('hidden')) {
+                        toggleProfileMenu(false);
+                        profileTrigger.focus();
+                    }
+                });
+            }
+
+            /* 2. Mobile Drawer Navigation */
+
             const mobileDialog = document.getElementById('mobile-navigation');
             const mobileOpenBtns = document.querySelectorAll('[data-mobile-menu-open]');
             const mobileCloseBtns = document.querySelectorAll('[data-mobile-menu-close]');
@@ -678,6 +888,7 @@
                 });
             }
 
+            /* 3. Desktop Sidebar Collapse & Tooltip */
             const sidebar = document.getElementById('app-sidebar');
             const toggleBtn = document.getElementById('sidebar-collapse-btn');
             const navContainer = document.getElementById('sidebar-nav-container');
